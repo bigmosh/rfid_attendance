@@ -46,7 +46,7 @@ def seed_demo_data():
         device_id, device_name = DEVICE
         device = session.scalar(select(Device).where(Device.device_id == device_id))
         if device is None:
-            session.add(Device(device_id=device_id, name=device_name))
+            session.add(Device(device_id=device_id, name=device_name, status="active"))
             LOGGER.info("Created demo device %s", device_id)
 
 

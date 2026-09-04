@@ -57,6 +57,13 @@ Verify the health check:
 curl http://127.0.0.1:8000/health
 ```
 
+The database health check performs only `SELECT 1` and returns no connection
+details. It requires a reachable local database:
+
+```bash
+curl http://127.0.0.1:8000/health/db
+```
+
 ## Migrations
 
 Alembic reads `DATABASE_URL` through `app.config`. The committed
@@ -90,15 +97,18 @@ source .venv/bin/activate
 pytest
 ```
 
-The backend tests currently cover the health endpoint and request-schema
-validation only. They do not require PostgreSQL or Raspberry Pi hardware.
+The backend tests cover the health endpoints, request-schema validation, and
+idempotent seed data. They use mocks and in-memory SQLite only; they do not
+require PostgreSQL or Raspberry Pi hardware.
 
 ## Docker and Coolify
 
-Build from the repository root so the Dockerfile can copy `backend/`:
+Build from the backend directory, which matches Coolify's `/backend` base
+directory:
 
 ```bash
-docker build -f backend/Dockerfile -t rfid-attendance-backend .
+cd backend
+docker build -t rfid-attendance-backend .
 ```
 
 Run locally with a PostgreSQL URL supplied at runtime:
@@ -115,14 +125,36 @@ For Coolify:
 
 - Repository: this repository.
 - Build pack/type: Dockerfile.
-- Dockerfile location: `backend/Dockerfile`.
-- Build context: repository root.
+- Base directory: `/backend`.
+- Dockerfile location: `Dockerfile`.
 - Application port: `8000`.
 - Environment: `DATABASE_URL`, `APP_ENV=production`, and `LOG_LEVEL=INFO`.
 - Domain and HTTPS/TLS: configured and terminated by Coolify's reverse proxy.
 
 No database credentials, domains, or application secrets belong in the Git
 repository or Dockerfile.
+
+### Post-deployment database operations
+
+After the Coolify application is deployed with `DATABASE_URL` configured, open
+its application terminal. The container work directory is `/app`. Run these
+commands once, in this order:
+
+```bash
+cd /app
+python -m alembic upgrade head
+python -m scripts.seed_demo_data
+```
+
+The migration command is explicit and is not run automatically at startup.
+The seed command is idempotent: it creates missing demo records and does not
+duplicate records on later runs.
+
+Afterward, test this path through the public Coolify domain:
+
+```text
+https://<your-configured-domain>/health/db
+```
 
 ## Current backend scope
 
