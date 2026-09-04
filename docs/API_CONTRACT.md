@@ -26,9 +26,8 @@ does not expose configuration or database details.
 
 `POST /api/v1/attendance`
 
-This endpoint is documented and its request/response schemas are prepared,
-but its route and database logic are intentionally deferred to the next
-approved milestone.
+This endpoint is implemented. It resolves the device, RFID card, and student
+from PostgreSQL and creates one attendance record for each valid request.
 
 Request:
 
@@ -91,3 +90,22 @@ Unknown device:
   "reason": "unknown_device"
 }
 ```
+
+Expected domain outcomes return HTTP `200` with `success: false`, so the
+Raspberry Pi can process them without interpreting them as backend failures.
+An unknown or inactive device returns `unknown_device`; this first contract
+does not distinguish a disabled device separately.
+
+### Validation and server errors
+
+`device_id`, `card_uid`, and `event_time` are required. `event_time` must be
+an ISO 8601 datetime with a timezone offset. Missing fields or a timezone-naive
+timestamp return FastAPI's HTTP `422` validation response.
+
+Unexpected database failures are rolled back, logged by the backend, and
+return HTTP `500` with a generic error message. No database details are sent
+to the client.
+
+For every request from a known active device, the backend updates that device's
+`last_seen` timestamp. There is deliberately no server-side time-window
+deduplication in this phase: each valid POST creates one attendance row.

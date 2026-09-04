@@ -6,6 +6,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
 from app.config import get_settings
+from app.routes.attendance import router as attendance_router
 from app.routes.health import router as health_router
 
 
@@ -37,6 +38,7 @@ def create_app():
         lifespan=lifespan,
     )
     application.include_router(health_router)
+    application.include_router(attendance_router)
     return application
 
 

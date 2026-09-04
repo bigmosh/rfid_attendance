@@ -97,9 +97,10 @@ source .venv/bin/activate
 pytest
 ```
 
-The backend tests cover the health endpoints, request-schema validation, and
-idempotent seed data. They use mocks and in-memory SQLite only; they do not
-require PostgreSQL or Raspberry Pi hardware.
+The backend tests cover health endpoints, attendance API outcomes,
+request-schema validation, model constraints, and idempotent seed data. They
+use mocks and in-memory SQLite only; they do not require PostgreSQL or
+Raspberry Pi hardware.
 
 ## Docker and Coolify
 
@@ -164,8 +165,6 @@ https://<your-configured-domain>/health/db
 
 ## Current backend scope
 
-`GET /health` is available. The attendance endpoint contract, SQLAlchemy
-models, Alembic schema, and seed script are prepared, but
-`POST /api/v1/attendance` is intentionally not implemented yet. The Raspberry
-Pi continues to use its local temporary lookup until that endpoint is approved
-and deployed.
+`GET /health`, `GET /health/db`, and `POST /api/v1/attendance` are available.
+The Raspberry Pi continues to use its local temporary lookup until Pi API
+integration is approved and deployed.
