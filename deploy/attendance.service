@@ -1,0 +1,16 @@
+[Unit]
+Description=RFID Attendance System
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=raspberry-user
+WorkingDirectory=/home/raspberry-user/rfid-attendance
+EnvironmentFile=/etc/rfid-attendance.env
+ExecStart=/home/raspberry-user/rfid-attendance/venv/bin/python /home/raspberry-user/rfid-attendance/main.py
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target

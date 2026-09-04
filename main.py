@@ -1,6 +1,7 @@
 """Application coordinator for Raspberry Pi RFID attendance."""
 
 import logging
+import signal
 import sys
 import time
 
@@ -14,6 +15,11 @@ from services.attendance import submit_attendance
 LOGGER = logging.getLogger(__name__)
 
 
+def _handle_shutdown_signal(_signum, _frame):
+    """Use the existing cleanup path when systemd sends SIGTERM."""
+    raise KeyboardInterrupt
+
+
 def configure_logging():
     logging.basicConfig(
         level=logging.INFO,
@@ -25,6 +31,7 @@ def run():
     """Run until Ctrl+C or an unrecoverable hardware error occurs."""
     display = None
     reader = None
+    signal.signal(signal.SIGTERM, _handle_shutdown_signal)
 
     try:
         LOGGER.info("Application starting")
@@ -72,7 +79,7 @@ def run():
             display.show_ready()
 
     except KeyboardInterrupt:
-        LOGGER.info("Ctrl+C received")
+        LOGGER.info("Shutdown requested")
         return 0
     except Exception:
         LOGGER.exception("Hardware error")

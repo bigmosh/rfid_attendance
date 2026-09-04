@@ -74,6 +74,71 @@ rsync -avh \
 Then run the same activation, dependency-installation, configuration, test,
 and `python3 main.py` commands shown in Option A.
 
+### Appliance startup with systemd
+
+Once the end-to-end application has been manually verified on the Pi, install
+the systemd unit. The unit starts after the network-online target, restarts the
+application three seconds after a crash, and sends normal application output to
+the system journal. A temporary backend outage does not stop the edge process:
+the existing attendance client displays a network error and continues polling.
+When systemd stops or restarts the unit, the application handles SIGTERM using
+its normal cleanup path for the RFID reader and OLED.
+
+Copy the service file:
+
+```bash
+cd /home/raspberry-user/rfid-attendance
+sudo cp deploy/attendance.service /etc/systemd/system/attendance.service
+```
+
+Create the production environment file from the committed placeholder example:
+
+```bash
+sudo cp deploy/rfid-attendance.env.example /etc/rfid-attendance.env
+sudo nano /etc/rfid-attendance.env
+```
+
+Set its values to the real HTTPS API domain and device configuration. Do not
+place API keys or future AES keys in the repository:
+
+```text
+API_BASE_URL=https://<your-configured-domain>
+DEVICE_ID=attendance-pi-01
+REQUEST_TIMEOUT_SECONDS=5
+```
+
+Restrict the environment-file permissions, load the new unit, enable it at
+boot, and start it now:
+
+```bash
+sudo chmod 600 /etc/rfid-attendance.env
+sudo systemctl daemon-reload
+sudo systemctl enable attendance.service
+sudo systemctl start attendance.service
+```
+
+Check the running service and follow its logs:
+
+```bash
+sudo systemctl status attendance.service
+journalctl -u attendance.service -f
+```
+
+Manage it when needed:
+
+```bash
+sudo systemctl restart attendance.service
+sudo systemctl stop attendance.service
+```
+
+Perform the final appliance test with:
+
+```bash
+sudo reboot
+```
+
+After reboot, do not manually run `python3 main.py`; systemd owns the process.
+
 ## Backend local setup
 
 Prerequisites: Python 3.12+ and an available PostgreSQL database.
