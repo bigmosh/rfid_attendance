@@ -1,0 +1,6 @@
+# RC522 library used by the proven hardware setup.
+git+https://github.com/hoffie/pi-rc522-gpiozero.git
+
+# OLED dependencies.
+adafruit-blinka
+adafruit-circuitpython-ssd1306
