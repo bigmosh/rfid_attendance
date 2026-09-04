@@ -4,3 +4,6 @@ git+https://github.com/hoffie/pi-rc522-gpiozero.git
 # OLED dependencies.
 adafruit-blinka
 adafruit-circuitpython-ssd1306
+
+# HTTPS client used by the edge attendance service.
+requests>=2.31,<3.0

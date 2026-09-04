@@ -8,7 +8,7 @@ from config import DISPLAY_RESULT_SECONDS, RFID_POLL_INTERVAL_SECONDS
 from hardware.buzzer import error_beep, success_beep
 from hardware.display import OLEDDisplay
 from hardware.rfid import RFIDReader
-from services.attendance import find_student
+from services.attendance import submit_attendance
 
 
 LOGGER = logging.getLogger(__name__)
@@ -41,15 +41,31 @@ def run():
                 continue
 
             LOGGER.info("Card detected")
-            student_name = find_student(uid)
+            attendance_result = submit_attendance(uid)
 
-            if student_name is not None:
-                LOGGER.info("Registered student detected: %s", student_name)
-                display.show_success(student_name)
+            if attendance_result.success:
+                LOGGER.info("Attendance recorded")
+                display.show_success(attendance_result.student_name)
                 success_beep()
-            else:
+            elif attendance_result.reason == "unknown_card":
                 LOGGER.info("Unknown card detected")
                 display.show_unknown()
+                error_beep()
+            elif attendance_result.reason == "card_disabled":
+                LOGGER.info("Disabled card detected")
+                display.show_error("Card disabled")
+                error_beep()
+            elif attendance_result.reason == "unknown_device":
+                LOGGER.error("Device is not registered by backend")
+                display.show_error("Device error")
+                error_beep()
+            elif attendance_result.reason == "network_error":
+                LOGGER.warning("Attendance backend is unreachable")
+                display.show_error("Network error")
+                error_beep()
+            else:
+                LOGGER.error("Unexpected attendance backend response")
+                display.show_error("Server error")
                 error_beep()
 
             _keep_removal_state_current(reader)

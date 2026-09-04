@@ -1,19 +1,28 @@
-"""Tests for hardware-independent attendance logic only."""
+"""Tests for hardware-independent attendance result types only."""
 
 import unittest
 
-from services.attendance import find_student
+from services.attendance import AttendanceResult
 
 
-class FindStudentTests(unittest.TestCase):
-    def test_returns_student_1_for_first_temporary_uid(self):
-        self.assertEqual(find_student("77-48-28-61-92"), "Student 1")
+class AttendanceResultTests(unittest.TestCase):
+    def test_success_result_carries_student_and_attendance_data(self):
+        result = AttendanceResult(
+            success=True,
+            student_name="Student 1",
+            student_number="ST001",
+            attendance_id=1,
+        )
 
-    def test_returns_student_2_for_second_temporary_uid(self):
-        self.assertEqual(find_student("51-164-2-51-166"), "Student 2")
+        self.assertTrue(result.success)
+        self.assertEqual(result.student_name, "Student 1")
+        self.assertEqual(result.attendance_id, 1)
 
-    def test_returns_none_for_unknown_uid(self):
-        self.assertIsNone(find_student("1-2-3-4-5"))
+    def test_failure_result_carries_a_reason(self):
+        result = AttendanceResult(success=False, reason="unknown_card")
+
+        self.assertFalse(result.success)
+        self.assertEqual(result.reason, "unknown_card")
 
 
 if __name__ == "__main__":

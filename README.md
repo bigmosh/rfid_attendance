@@ -21,7 +21,58 @@ python3 main.py
 ```
 
 Do not install backend dependencies into the Raspberry Pi hardware virtual
-environment. The edge application is not yet connected to the backend.
+environment.
+
+### Edge API configuration
+
+The edge application sends RFID events to the backend over HTTPS. Configure
+these environment variables in the shell that starts `main.py`; do not place a
+real production URL in source code:
+
+```bash
+export API_BASE_URL='https://<your-configured-domain>'
+export DEVICE_ID='attendance-pi-01'
+export REQUEST_TIMEOUT_SECONDS='5'
+```
+
+If `API_BASE_URL` is not configured, the application uses the safe placeholder
+`https://attendance.example.invalid` and shows a network error rather than
+sending attendance data over plain HTTP.
+
+The Pi creates the event timestamp with `datetime.now().astimezone()`, using
+its configured system timezone. It does not fabricate a timezone offset.
+
+### Deploying edge updates to the Raspberry Pi
+
+Option A — use Git only if the Pi directory is already a clone configured with
+this repository's `origin` remote:
+
+```bash
+cd /home/raspberry-user/rfid-attendance
+git pull --ff-only origin main
+source venv/bin/activate
+python3 -m pip install -r requirements.txt
+export API_BASE_URL='https://<your-configured-domain>'
+export DEVICE_ID='attendance-pi-01'
+export REQUEST_TIMEOUT_SECONDS='5'
+python3 -m unittest discover -s tests -v
+python3 main.py
+```
+
+Option B — copy the project from the development laptop without replacing the
+Pi virtual environment:
+
+```bash
+rsync -avh \
+  --exclude='venv/' \
+  --exclude='__pycache__/' \
+  --exclude='*.pyc' \
+  /Users/faskt/Documents/projects/rfid_project/ \
+  raspberry-user@attendance-pi.local:/home/raspberry-user/rfid-attendance/
+```
+
+Then run the same activation, dependency-installation, configuration, test,
+and `python3 main.py` commands shown in Option A.
 
 ## Backend local setup
 
