@@ -19,7 +19,11 @@ class RFIDCard(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     uid: Mapped[str] = mapped_column(String(128), unique=True, nullable=False)
-    student_id: Mapped[int] = mapped_column(ForeignKey("students.id"), nullable=False)
+    student_id: Mapped[int] = mapped_column(
+        ForeignKey("students.id"),
+        index=True,
+        nullable=False,
+    )
     status: Mapped[CardStatus] = mapped_column(
         SqlEnum(
             CardStatus,

@@ -150,6 +150,12 @@ The migration command is explicit and is not run automatically at startup.
 The seed command is idempotent: it creates missing demo records and does not
 duplicate records on later runs.
 
+Optionally confirm that the database is at the current Alembic revision:
+
+```bash
+python -m alembic current
+```
+
 Afterward, test this path through the public Coolify domain:
 
 ```text

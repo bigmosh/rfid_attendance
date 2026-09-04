@@ -12,9 +12,21 @@ class Attendance(Base):
     __tablename__ = "attendance"
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    student_id: Mapped[int] = mapped_column(ForeignKey("students.id"), nullable=False)
-    rfid_card_id: Mapped[int] = mapped_column(ForeignKey("rfid_cards.id"), nullable=False)
-    device_id: Mapped[int] = mapped_column(ForeignKey("devices.id"), nullable=False)
+    student_id: Mapped[int] = mapped_column(
+        ForeignKey("students.id"),
+        index=True,
+        nullable=False,
+    )
+    rfid_card_id: Mapped[int] = mapped_column(
+        ForeignKey("rfid_cards.id"),
+        index=True,
+        nullable=False,
+    )
+    device_id: Mapped[int] = mapped_column(
+        ForeignKey("devices.id"),
+        index=True,
+        nullable=False,
+    )
     event_time: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     server_received_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
