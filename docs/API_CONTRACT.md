@@ -22,6 +22,53 @@ Response:
 The endpoint is implemented now. It is suitable for Coolify health checks and
 does not expose configuration or database details.
 
+## Dashboard read APIs
+
+`GET /api/v1/dashboard/summary` returns real counts for students, attendance
+in the configured application timezone, registered devices, and active RFID
+cards:
+
+```json
+{
+  "total_students": 2,
+  "attendance_today": 8,
+  "registered_devices": 1,
+  "active_rfid_cards": 2
+}
+```
+
+`GET /api/v1/attendance` returns newest-first attendance records. It accepts
+optional `page`, `page_size`, `search`, `date` (`YYYY-MM-DD`), and `device_id`
+query parameters. `page` starts at 1 and `page_size` is limited to 1–100.
+Every item includes timezone-aware `event_time` and `server_received_at`
+values:
+
+```json
+{
+  "items": [
+    {
+      "id": 10,
+      "student": {
+        "id": 1,
+        "student_number": "ST001",
+        "name": "Student 1"
+      },
+      "device": {
+        "device_id": "attendance-pi-01",
+        "name": "Main Attendance Device"
+      },
+      "event_time": "2026-09-05T09:04:00+03:00",
+      "server_received_at": "2026-09-05T06:04:01Z",
+      "status": "recorded"
+    }
+  ],
+  "page": 1,
+  "page_size": 20,
+  "total": 42,
+  "pages": 3
+}
+```
+
 ## Record attendance
 
 `POST /api/v1/attendance`

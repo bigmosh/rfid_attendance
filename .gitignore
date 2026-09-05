@@ -24,3 +24,7 @@ venv/
 *.swp
 *.swo
 *~
+
+# Frontend build artifacts
+node_modules/
+dist/

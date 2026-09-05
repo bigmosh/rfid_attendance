@@ -4,9 +4,11 @@ import logging
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import get_settings
 from app.routes.attendance import router as attendance_router
+from app.routes.dashboard import router as dashboard_router
 from app.routes.health import router as health_router
 
 
@@ -37,8 +39,16 @@ def create_app():
         version="0.1.0",
         lifespan=lifespan,
     )
+    application.add_middleware(
+        CORSMiddleware,
+        allow_origins=settings.cors_origin_list,
+        allow_credentials=False,
+        allow_methods=["GET", "POST"],
+        allow_headers=["Content-Type"],
+    )
     application.include_router(health_router)
     application.include_router(attendance_router)
+    application.include_router(dashboard_router)
     return application
 
 

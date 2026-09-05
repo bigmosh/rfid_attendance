@@ -1,11 +1,19 @@
 """Attendance API request and response schemas for the next implementation step."""
 
 from datetime import datetime
+from math import ceil
 from typing import Literal
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from app.schemas.common import StudentResponse
+
+
+class DeviceResponse(BaseModel):
+    device_id: str
+    name: str
+
+    model_config = ConfigDict(from_attributes=True)
 
 
 class AttendanceRequest(BaseModel):
@@ -37,3 +45,30 @@ class AttendanceSuccessResponse(BaseModel):
 class AttendanceFailureResponse(BaseModel):
     success: Literal[False] = False
     reason: Literal["unknown_card", "card_disabled", "unknown_device"]
+
+
+class AttendanceListItem(BaseModel):
+    id: int
+    student: StudentResponse
+    device: DeviceResponse
+    event_time: datetime
+    server_received_at: datetime
+    status: Literal["recorded"] = "recorded"
+
+
+class AttendanceListResponse(BaseModel):
+    items: list[AttendanceListItem]
+    page: int
+    page_size: int
+    total: int
+    pages: int
+
+    @classmethod
+    def from_items(cls, items, page, page_size, total):
+        return cls(
+            items=items,
+            page=page,
+            page_size=page_size,
+            total=total,
+            pages=ceil(total / page_size) if total else 0,
+        )

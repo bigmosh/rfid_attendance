@@ -10,6 +10,10 @@ The repository currently contains two independent parts:
   and OLED hardware modules remain local-only and are not containerized.
 - A FastAPI/PostgreSQL backend preparation layer in `backend/`, intended for
   deployment from Git through Coolify.
+- A React dashboard in `frontend/` that reads dashboard data through FastAPI.
+
+The complete data path is Raspberry Pi → HTTPS → FastAPI → PostgreSQL →
+dashboard. The dashboard is read-only in Stage 1.
 
 ## Raspberry Pi edge application
 
@@ -180,6 +184,70 @@ details. It requires a reachable local database:
 curl http://127.0.0.1:8000/health/db
 ```
 
+### Dashboard API configuration
+
+The read-only dashboard APIs use `APP_TIMEZONE` for the `attendance_today`
+summary and date filtering. For the Finland demonstration, configure:
+
+```text
+APP_TIMEZONE=Europe/Helsinki
+```
+
+When the frontend is deployed on a separate domain, configure a strict,
+comma-separated CORS allowlist on the backend. Do not use `*` in production:
+
+```text
+CORS_ORIGINS=https://<your-dashboard-domain>
+```
+
+Multiple trusted origins can be supplied as a comma-separated value, for
+example a production dashboard and a local Vite development server.
+
+## Dashboard frontend
+
+The Stage 1 React dashboard is read-only. It has Overview, Attendance,
+Students placeholder, and Devices placeholder routes. Overview and Attendance
+poll the backend every eight seconds so a newly scanned card appears without a
+manual browser refresh.
+
+Run it locally:
+
+```bash
+cd frontend
+cp .env.example .env
+# Set VITE_API_BASE_URL to the local or deployed FastAPI base URL.
+npm install
+npm run dev
+```
+
+`VITE_API_BASE_URL` is a public, build-time browser value. It must contain only
+the FastAPI base URL, never database credentials, keys, or secrets.
+
+Validate TypeScript and produce a production build:
+
+```bash
+npm run typecheck
+npm run build
+```
+
+### Frontend Coolify deployment
+
+Deploy `frontend/` as a separate Coolify application:
+
+- Build type: Dockerfile
+- Base directory: `/frontend`
+- Dockerfile location: `Dockerfile`
+- Exposed application port: `80`
+- Build environment variable: `VITE_API_BASE_URL=https://<your-api-domain>`
+
+The Docker image builds Vite with Node and serves the resulting static files
+with nginx. Its nginx configuration falls back to `index.html`, so direct
+browser refreshes of `/attendance` work correctly.
+
+Before deploying the frontend, add its final HTTPS domain to the backend
+application's `CORS_ORIGINS` value and redeploy the backend. Also set
+`APP_TIMEZONE=Europe/Helsinki` in the backend environment for the demonstration.
+
 ## Migrations
 
 Alembic reads `DATABASE_URL` through `app.config`. The committed
@@ -246,6 +314,8 @@ For Coolify:
 - Dockerfile location: `Dockerfile`.
 - Application port: `8000`.
 - Environment: `DATABASE_URL`, `APP_ENV=production`, and `LOG_LEVEL=INFO`.
+- Additional dashboard environment: `APP_TIMEZONE=Europe/Helsinki` and a
+  strict `CORS_ORIGINS` allowlist containing the frontend domain.
 - Domain and HTTPS/TLS: configured and terminated by Coolify's reverse proxy.
 
 No database credentials, domains, or application secrets belong in the Git
