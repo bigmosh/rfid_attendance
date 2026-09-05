@@ -1,6 +1,6 @@
 """Add student lifecycle status and enforce one active card per student.
 
-Revision ID: 0003_add_student_status_and_active_card_constraint
+Revision ID: 0003_student_status
 Revises: 0002_add_foreign_key_indexes
 Create Date: 2026-09-05
 """
@@ -10,7 +10,7 @@ import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
 
-revision = "0003_add_student_status_and_active_card_constraint"
+revision = "0003_student_status"
 down_revision = "0002_add_foreign_key_indexes"
 branch_labels = None
 depends_on = None

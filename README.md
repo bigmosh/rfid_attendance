@@ -268,9 +268,9 @@ application's `CORS_ORIGINS` value and redeploy the backend. Also set
 
 Alembic reads `DATABASE_URL` through `app.config`. The committed
 `0001_initial_schema` migration creates the initial PostgreSQL schema.
-`0003_add_student_status_and_active_card_constraint` adds the non-destructive
-student lifecycle status and a PostgreSQL partial unique index that allows at
-most one active RFID card per student.
+`0003_student_status` adds the non-destructive student lifecycle status and a
+PostgreSQL partial unique index that allows at most one active RFID card per
+student.
 
 For later model changes, generate a migration from `backend/`, review it, and
 apply it explicitly:
