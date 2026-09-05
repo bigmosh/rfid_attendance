@@ -3,6 +3,8 @@ import type {
   DashboardSummary,
   RFIDCard,
   RFIDCardStatus,
+  EnrollmentDevice,
+  EnrollmentResponse,
   StudentCreateInput,
   StudentDetail,
   StudentListResponse,
@@ -120,4 +122,23 @@ export function getStudentAttendance(studentId: number, params: Record<string, s
   });
   const suffix = query.size ? `?${query.toString()}` : "";
   return getJson<AttendanceListResponse>(`/api/v1/students/${studentId}/attendance${suffix}`);
+}
+
+export function listDevices(): Promise<EnrollmentDevice[]> {
+  return getJson<EnrollmentDevice[]>("/api/v1/devices");
+}
+
+export function createEnrollment(studentId: number, deviceId: string): Promise<EnrollmentResponse> {
+  return sendJson<EnrollmentResponse>("/api/v1/enrollments", "POST", {
+    student_id: studentId,
+    device_id: deviceId,
+  });
+}
+
+export function getEnrollment(enrollmentId: number): Promise<EnrollmentResponse> {
+  return getJson<EnrollmentResponse>(`/api/v1/enrollments/${enrollmentId}`);
+}
+
+export function cancelEnrollment(enrollmentId: number): Promise<EnrollmentResponse> {
+  return sendJson<EnrollmentResponse>(`/api/v1/enrollments/${enrollmentId}/cancel`, "POST");
 }

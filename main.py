@@ -4,12 +4,18 @@ import logging
 import signal
 import sys
 import time
+from datetime import datetime, timezone
 
-from config import DISPLAY_RESULT_SECONDS, RFID_POLL_INTERVAL_SECONDS
+from config import (
+    DISPLAY_RESULT_SECONDS,
+    ENROLLMENT_POLL_SECONDS,
+    RFID_POLL_INTERVAL_SECONDS,
+)
 from hardware.buzzer import error_beep, success_beep
 from hardware.display import OLEDDisplay
 from hardware.rfid import RFIDReader
 from services.attendance import submit_attendance
+from services.enrollment import poll_enrollment, submit_enrollment_card
 
 
 LOGGER = logging.getLogger(__name__)
@@ -40,14 +46,85 @@ def run():
 
         reader = RFIDReader()
         display.show_ready()
+        active_enrollment = None
+        next_enrollment_poll = time.monotonic()
 
         while True:
+            now = time.monotonic()
+            if now >= next_enrollment_poll:
+                poll_result = poll_enrollment()
+                next_enrollment_poll = now + ENROLLMENT_POLL_SECONDS
+                if poll_result.status == "pending":
+                    if (
+                        active_enrollment is None
+                        or active_enrollment.id != poll_result.enrollment.id
+                    ):
+                        active_enrollment = poll_result.enrollment
+                        LOGGER.info("Enrollment mode entered (id=%s)", active_enrollment.id)
+                        display.show_enrollment(active_enrollment.student_name)
+                elif poll_result.status == "none" and active_enrollment is not None:
+                    if datetime.now(timezone.utc) >= active_enrollment.expires_at:
+                        display.show_enrollment_expired()
+                    else:
+                        display.show_enrollment_cancelled()
+                    error_beep()
+                    _keep_removal_state_current(reader)
+                    active_enrollment = None
+                    display.show_ready()
+                elif poll_result.status == "error":
+                    LOGGER.warning("Enrollment polling failed: %s", poll_result.reason)
+
             uid = reader.poll()
             if uid is None:
                 time.sleep(RFID_POLL_INTERVAL_SECONDS)
                 continue
 
             LOGGER.info("Card detected")
+            if active_enrollment is not None:
+                submission = submit_enrollment_card(active_enrollment.id, uid)
+                if submission.success:
+                    LOGGER.info("RFID enrollment completed")
+                    display.show_card_registered(
+                        submission.student_name or active_enrollment.student_name
+                    )
+                    success_beep()
+                    _keep_removal_state_current(reader)
+                    active_enrollment = None
+                    next_enrollment_poll = time.monotonic()
+                    display.show_ready()
+                elif submission.reason == "card_already_assigned":
+                    LOGGER.info("Enrollment card is already assigned")
+                    display.show_card_in_use()
+                    error_beep()
+                    _keep_removal_state_current(reader)
+                    display.show_enrollment(active_enrollment.student_name)
+                elif submission.reason == "network_error":
+                    LOGGER.warning("Enrollment submission network error")
+                    display.show_network_error()
+                    error_beep()
+                    _keep_removal_state_current(reader)
+                    display.show_enrollment(active_enrollment.student_name)
+                elif submission.reason == "enrollment_expired":
+                    display.show_enrollment_expired()
+                    error_beep()
+                    _keep_removal_state_current(reader)
+                    active_enrollment = None
+                    display.show_ready()
+                elif submission.reason == "enrollment_cancelled":
+                    display.show_enrollment_cancelled()
+                    error_beep()
+                    _keep_removal_state_current(reader)
+                    active_enrollment = None
+                    display.show_ready()
+                else:
+                    LOGGER.warning("Enrollment ended without completion: %s", submission.reason)
+                    display.show_enrollment_failed()
+                    error_beep()
+                    _keep_removal_state_current(reader)
+                    active_enrollment = None
+                    display.show_ready()
+                continue
+
             attendance_result = submit_attendance(uid)
 
             if attendance_result.success:

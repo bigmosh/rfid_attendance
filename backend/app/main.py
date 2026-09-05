@@ -9,6 +9,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.config import get_settings
 from app.routes.attendance import router as attendance_router
 from app.routes.dashboard import router as dashboard_router
+from app.routes.devices import router as devices_router
+from app.routes.enrollment import router as enrollment_router
 from app.routes.health import router as health_router
 from app.routes.students import router as students_router
 
@@ -51,6 +53,8 @@ def create_app():
     application.include_router(attendance_router)
     application.include_router(dashboard_router)
     application.include_router(students_router)
+    application.include_router(devices_router)
+    application.include_router(enrollment_router)
     return application
 
 

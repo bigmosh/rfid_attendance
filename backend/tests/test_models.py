@@ -9,7 +9,7 @@ from sqlalchemy.orm import sessionmaker
 
 from app.database import Base
 import app.models
-from app.models import Attendance, Device, RFIDCard, Student, StudentStatus
+from app.models import Attendance, Device, EnrollmentRequest, RFIDCard, Student, StudentStatus
 
 
 @pytest.fixture
@@ -23,7 +23,13 @@ def session():
 
 def test_models_define_expected_tables_foreign_keys_timestamps_and_indexes():
     tables = Base.metadata.tables
-    assert set(tables) == {"students", "rfid_cards", "devices", "attendance"}
+    assert set(tables) == {
+        "students",
+        "rfid_cards",
+        "devices",
+        "attendance",
+        "enrollment_requests",
+    }
     assert tables["students"].c.status.type.enums == ["active", "inactive"]
 
     assert {foreign_key.target_fullname for foreign_key in tables["rfid_cards"].foreign_keys} == {
@@ -34,12 +40,18 @@ def test_models_define_expected_tables_foreign_keys_timestamps_and_indexes():
         "rfid_cards.id",
         "devices.id",
     }
+    assert {foreign_key.target_fullname for foreign_key in tables["enrollment_requests"].foreign_keys} == {
+        "students.id",
+        "devices.id",
+    }
 
-    for table_name in ("students", "rfid_cards", "devices", "attendance"):
+    for table_name in ("students", "rfid_cards", "devices", "attendance", "enrollment_requests"):
         assert tables[table_name].c.created_at.type.timezone is True
     assert tables["devices"].c.last_seen.type.timezone is True
     assert tables["attendance"].c.event_time.type.timezone is True
     assert tables["attendance"].c.server_received_at.type.timezone is True
+    assert tables["enrollment_requests"].c.expires_at.type.timezone is True
+    assert tables["enrollment_requests"].c.completed_at.type.timezone is True
 
     assert {index.name for index in tables["rfid_cards"].indexes} == {
         "ix_rfid_cards_student_id",
@@ -49,6 +61,11 @@ def test_models_define_expected_tables_foreign_keys_timestamps_and_indexes():
         "ix_attendance_student_id",
         "ix_attendance_rfid_card_id",
         "ix_attendance_device_id",
+    }
+    assert {index.name for index in tables["enrollment_requests"].indexes} == {
+        "ix_enrollment_requests_device_id",
+        "ix_enrollment_requests_student_id",
+        "uq_enrollment_requests_one_pending_per_device",
     }
 
 

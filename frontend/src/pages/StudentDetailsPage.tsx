@@ -10,6 +10,7 @@ import {
   updateStudent,
 } from "../api/client";
 import { AttendanceTable } from "../components/AttendanceTable";
+import { EnrollmentModal } from "./EnrollmentModal";
 import type { AttendanceListResponse, StudentDetail } from "../types/api";
 
 function formatCreatedAt(value: string): string {
@@ -26,6 +27,7 @@ export function StudentDetailsPage() {
   const [error, setError] = useState<string>();
   const [message, setMessage] = useState<string>();
   const [saving, setSaving] = useState(false);
+  const [showEnrollment, setShowEnrollment] = useState(false);
 
   const load = async () => {
     if (!Number.isInteger(studentId) || studentId < 1) { setError("Student not found."); return; }
@@ -83,6 +85,7 @@ export function StudentDetailsPage() {
   if (error && !student) return <div className="error-state"><h2>Unable to load student.</h2><p>{error}</p><Link to="/students">Back to students</Link></div>;
   if (!student || !attendance) return <div className="loading">Loading student details…</div>;
   const card = student.rfid_card;
+  const hasActiveCard = card?.status === "active";
   return <>
     <Link className="back-link" to="/students">← Students</Link>
     {error ? <div className="error-state"><h2>Unable to complete student action.</h2><p>{error}</p></div> : null}
@@ -90,8 +93,9 @@ export function StudentDetailsPage() {
     <section className="detail-hero"><div><p className="eyebrow">STUDENT</p><h2>{student.name}</h2><p>{student.student_number} <span className={`status ${student.status}`}>{student.status}</span></p></div><button className="secondary" disabled={saving} onClick={changeStudentStatus}>{student.status === "active" ? "Deactivate Student" : "Reactivate Student"}</button></section>
     <div className="detail-grid">
       <section className="panel"><div className="panel-heading"><div><h2>Student Information</h2><p>Edit the stored student record.</p></div></div><form className="stacked-form" onSubmit={saveStudent}><label>Full Name<input required value={name} onChange={(event) => setName(event.target.value)} /></label><label>Student Number<input required value={studentNumber} onChange={(event) => setStudentNumber(event.target.value)} /></label><p className="meta">Created {formatCreatedAt(student.created_at)}</p><button disabled={saving} type="submit">{saving ? "Saving…" : "Save Student"}</button></form></section>
-      <section className="panel"><div className="panel-heading"><div><h2>RFID Card</h2><p>Manual registration only. Physical enrollment is planned for Stage 3.</p></div></div>{card ? <><dl className="detail-list"><div><dt>UID</dt><dd>{card.uid}</dd></div><div><dt>Status</dt><dd><span className={`status ${card.status}`}>{card.status}</span></dd></div></dl><div className="card-actions">{card.status === "active" ? <><button className="secondary" disabled={saving} onClick={() => { if (window.confirm("Disable this RFID card? Future scans will be rejected.")) void perform(() => updateCardStatus(studentId, "disabled"), "RFID card disabled."); }}>Disable Card</button><button className="danger" disabled={saving} onClick={() => { if (window.confirm("Unassign this RFID card? It will be disabled and its attendance history preserved.")) void perform(() => unassignCard(studentId), "RFID card unassigned and disabled."); }}>Unassign Card</button></> : <button disabled={saving} onClick={() => void perform(() => updateCardStatus(studentId, "active"), "RFID card reactivated.")}>Reactivate Card</button>}</div></> : <div className="empty-state">No RFID card registered.</div>}<form className="stacked-form card-form" onSubmit={submitCard}><label>{card ? "Replace RFID Card UID" : "Assign RFID Card UID"}<input required placeholder="77-48-28-61-92" value={uid} onChange={(event) => setUid(event.target.value)} /></label><button disabled={saving} type="submit">{card ? "Replace Card" : "Assign Card"}</button></form></section>
+      <section className="panel"><div className="panel-heading"><div><h2>RFID Card</h2><p>Register a physical card using an attendance device.</p></div></div>{card ? <><dl className="detail-list"><div><dt>UID</dt><dd>{card.uid}</dd></div><div><dt>Status</dt><dd><span className={`status ${card.status}`}>{card.status}</span></dd></div></dl><div className="card-actions">{card.status === "active" ? <><button className="secondary" disabled={saving} onClick={() => { if (window.confirm("Disable this RFID card? Future scans will be rejected.")) void perform(() => updateCardStatus(studentId, "disabled"), "RFID card disabled."); }}>Disable Card</button><button className="danger" disabled={saving} onClick={() => { if (window.confirm("Unassign this RFID card? It will be disabled and its attendance history preserved.")) void perform(() => unassignCard(studentId), "RFID card unassigned and disabled."); }}>Unassign Card</button></> : <button disabled={saving} onClick={() => void perform(() => updateCardStatus(studentId, "active"), "RFID card reactivated.")}>Reactivate Card</button>}</div></> : <div className="empty-state">No RFID card registered.</div>}<div className="device-registration"><h3>{hasActiveCard ? "Replace using attendance device" : "Register using attendance device"}</h3><p>Stage 3 physical enrollment. The next card tapped on the chosen device will be assigned here.</p><button disabled={saving || student.status !== "active"} onClick={() => setShowEnrollment(true)}>{hasActiveCard ? "Replace Card Using Device" : "Register RFID Card"}</button></div><form className="stacked-form card-form" onSubmit={submitCard}><h3>Manual assignment</h3><label>{hasActiveCard ? "Replacement RFID UID" : "RFID UID"}<input required placeholder="77-48-28-61-92" value={uid} onChange={(event) => setUid(event.target.value)} /></label><button className="secondary" disabled={saving} type="submit">{hasActiveCard ? "Replace Card Manually" : "Assign Card Manually"}</button></form></section>
     </div>
     <section className="panel attendance-history"><div className="panel-heading"><div><h2>Attendance History</h2><p>Most recent attendance records for this student.</p></div></div><AttendanceTable records={attendance.items} /></section>
+    {showEnrollment ? <EnrollmentModal student={student} replaceExisting={hasActiveCard} onClose={() => setShowEnrollment(false)} onCompleted={load} /> : null}
   </>;
 }

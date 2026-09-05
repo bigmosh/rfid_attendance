@@ -25,3 +25,8 @@ try:
     REQUEST_TIMEOUT_SECONDS = float(os.getenv("REQUEST_TIMEOUT_SECONDS", "5"))
 except ValueError:
     REQUEST_TIMEOUT_SECONDS = 5.0
+
+try:
+    ENROLLMENT_POLL_SECONDS = float(os.getenv("ENROLLMENT_POLL_SECONDS", "3"))
+except ValueError:
+    ENROLLMENT_POLL_SECONDS = 3.0

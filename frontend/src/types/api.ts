@@ -72,3 +72,26 @@ export interface StudentUpdateInput {
   name?: string;
   status?: StudentStatus;
 }
+
+export interface EnrollmentDevice {
+  id: number;
+  device_id: string;
+  name: string;
+  status: string;
+  last_seen: string | null;
+}
+
+export type EnrollmentStatus = "pending" | "completed" | "cancelled" | "expired" | "failed";
+
+export interface EnrollmentStudent extends Student {}
+
+export interface EnrollmentResponse {
+  id: number;
+  status: EnrollmentStatus;
+  student: EnrollmentStudent;
+  device: Pick<EnrollmentDevice, "device_id" | "name">;
+  created_at: string;
+  expires_at: string;
+  completed_at: string | null;
+  failure_reason: string | null;
+}

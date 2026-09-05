@@ -2,6 +2,7 @@
 
 from functools import lru_cache
 
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -13,6 +14,7 @@ class Settings(BaseSettings):
     database_url: str
     app_timezone: str = "Europe/Helsinki"
     cors_origins: str = ""
+    rfid_enrollment_timeout_seconds: int = Field(default=60, ge=15, le=600)
 
     model_config = SettingsConfigDict(
         env_file=".env",

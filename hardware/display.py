@@ -48,13 +48,36 @@ class OLEDDisplay:
     def show_error(self, message):
         self._show_lines("ERROR", message)
 
+    def show_enrollment(self, student_name):
+        """Show that the next RFID card is reserved for registration."""
+        self._show_lines("REGISTER CARD", student_name, "", "Tap new card...")
+
+    def show_card_registered(self, student_name):
+        self._show_lines("CARD REGISTERED", student_name)
+
+    def show_card_in_use(self):
+        self._show_lines("CARD IN USE", "", "Try another card")
+
+    def show_enrollment_expired(self):
+        self._show_lines("REGISTRATION", "EXPIRED")
+
+    def show_enrollment_cancelled(self):
+        self._show_lines("REGISTRATION", "CANCELLED")
+
+    def show_enrollment_failed(self):
+        self._show_lines("REGISTRATION", "FAILED")
+
+    def show_network_error(self):
+        self._show_lines("NETWORK ERROR", "", "Try again")
+
     def _show_lines(self, *lines):
         image = Image.new("1", (OLED_WIDTH, OLED_HEIGHT))
         draw = ImageDraw.Draw(image)
 
         y_position = 0
         for line in lines:
-            draw.text((0, y_position), line, font=self._font, fill=255)
+            # The default bitmap font fits about 21 characters on a 128px OLED.
+            draw.text((0, y_position), str(line)[:21], font=self._font, fill=255)
             y_position += 16
 
         self._oled.image(image)

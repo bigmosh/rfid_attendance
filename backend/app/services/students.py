@@ -185,19 +185,43 @@ def _ensure_uid_is_available(database_session: Session, uid: str):
         raise ConflictError("rfid_uid_exists", "RFID UID is already assigned")
 
 
+def prepare_rfid_card_assignment(
+    database_session: Session,
+    student_id: int,
+    uid: str,
+    replace_existing: bool,
+) -> RFIDCard:
+    """Apply assignment rules without committing a surrounding transaction.
+
+    Stage 2 manual assignment commits this work directly. Device-assisted
+    enrollment reuses it before atomically recording the enrollment outcome.
+    """
+    _get_student(database_session, student_id)
+    _ensure_uid_is_available(database_session, uid)
+    current_card = _active_card(database_session, student_id)
+    if current_card is not None:
+        if not replace_existing:
+            raise ConflictError("active_card_exists", "Student already has an active RFID card")
+        current_card.status = CardStatus.DISABLED
+
+    card = RFIDCard(uid=uid, student_id=student_id, status=CardStatus.ACTIVE)
+    database_session.add(card)
+    database_session.flush()
+    return card
+
+
 def assign_rfid_card(
     database_session: Session,
     student_id: int,
     request: RFIDCardCreateRequest,
 ) -> RFIDCardResponse:
     """Manually assign the first active card to a student."""
-    _get_student(database_session, student_id)
-    _ensure_uid_is_available(database_session, request.uid)
-    if _active_card(database_session, student_id):
-        raise ConflictError("active_card_exists", "Student already has an active RFID card")
-
-    card = RFIDCard(uid=request.uid, student_id=student_id, status=CardStatus.ACTIVE)
-    database_session.add(card)
+    card = prepare_rfid_card_assignment(
+        database_session,
+        student_id,
+        request.uid,
+        replace_existing=False,
+    )
     _commit(database_session, "active_card_exists", "Student already has an active RFID card")
     database_session.refresh(card)
     LOGGER.info("RFID card assigned to student %s", student_id)
@@ -210,14 +234,12 @@ def replace_rfid_card(
     request: RFIDCardCreateRequest,
 ) -> RFIDCardResponse:
     """Disable the current card and create a new active card atomically."""
-    _get_student(database_session, student_id)
-    _ensure_uid_is_available(database_session, request.uid)
-    current_card = _active_card(database_session, student_id)
-    if current_card is not None:
-        current_card.status = CardStatus.DISABLED
-
-    card = RFIDCard(uid=request.uid, student_id=student_id, status=CardStatus.ACTIVE)
-    database_session.add(card)
+    card = prepare_rfid_card_assignment(
+        database_session,
+        student_id,
+        request.uid,
+        replace_existing=True,
+    )
     _commit(database_session, "active_card_exists", "Student already has an active RFID card")
     database_session.refresh(card)
     LOGGER.info("RFID card replaced for student %s", student_id)

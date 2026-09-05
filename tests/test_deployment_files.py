@@ -38,6 +38,7 @@ class DeploymentFileTests(unittest.TestCase):
         self.assertIn("API_BASE_URL=https://example-attendance-domain", environment)
         self.assertIn("DEVICE_ID=attendance-pi-01", environment)
         self.assertIn("REQUEST_TIMEOUT_SECONDS=5", environment)
+        self.assertIn("ENROLLMENT_POLL_SECONDS=3", environment)
         self.assertNotIn("PASSWORD=", environment)
         self.assertNotIn("AES", environment)
 

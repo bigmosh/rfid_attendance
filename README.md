@@ -47,6 +47,23 @@ sending attendance data over plain HTTP.
 The Pi creates the event timestamp with `datetime.now().astimezone()`, using
 its configured system timezone. It does not fabricate a timezone offset.
 
+### Physical RFID enrollment polling
+
+The Pi remains in normal attendance mode unless the dashboard creates a
+pending enrollment for its configured `DEVICE_ID`. It checks the backend using
+scheduled HTTPS polling without sleeping the RFID loop. Configure the polling
+interval in the Pi environment file:
+
+```text
+ENROLLMENT_POLL_SECONDS=3
+```
+
+When the backend reports a pending request, the Pi enters enrollment mode and
+the next card UID is sent only to the enrollment endpoint, never to attendance.
+On completion, cancellation, expiration, or terminal failure it returns to
+normal attendance. A duplicate-card or network submission error keeps the
+enrollment active after the card is removed, allowing a safe retry.
+
 ### Deploying edge updates to the Raspberry Pi
 
 Option A — use Git only if the Pi directory is already a clone configured with
@@ -219,12 +236,12 @@ normal application response `{"success": false, "reason": "student_inactive"}`
 and do not create attendance rows. Reactivating the student restores normal
 attendance eligibility when their card is also active.
 
-The dashboard performs **manual UID assignment only** in this phase. It does
-not place a Raspberry Pi into card-enrollment mode; physical tap-to-enroll is a
-Stage 3 feature. A student may have one active RFID card. Replacing a card
-disables the old card and creates a new active row, retaining every historical
-attendance reference. “Unassign” is deliberately implemented as disabling the
-active card, not deleting a row, so attendance history remains intact.
+The dashboard supports physical device-assisted enrollment and retains manual
+UID assignment as a secondary administrative/development option. A student may
+have one active RFID card. Replacing a card disables the old card and creates a
+new active row, retaining every historical attendance reference. “Unassign” is
+deliberately implemented as disabling the active card, not deleting a row, so
+attendance history remains intact.
 
 Run it locally:
 
@@ -271,6 +288,8 @@ Alembic reads `DATABASE_URL` through `app.config`. The committed
 `0003_student_status` adds the non-destructive student lifecycle status and a
 PostgreSQL partial unique index that allows at most one active RFID card per
 student.
+`0004_rfid_enrollment` adds device-scoped enrollment history, expiration, and
+the one-pending-enrollment-per-device constraint.
 
 For later model changes, generate a migration from `backend/`, review it, and
 apply it explicitly:
@@ -366,6 +385,50 @@ Afterward, test this path through the public Coolify domain:
 
 ```text
 https://<your-configured-domain>/health/db
+```
+
+### Stage 3 physical card enrollment deployment
+
+The backend calculates enrollment expiry using a timezone-aware UTC timestamp.
+Set this Coolify backend environment variable before deploying Stage 3:
+
+```text
+RFID_ENROLLMENT_TIMEOUT_SECONDS=60
+```
+
+After the new backend image is deployed, run the controlled migration in its
+Coolify terminal:
+
+```bash
+cd /app
+python -m alembic upgrade head
+python -m alembic current
+```
+
+Then deploy the frontend. The student details page lets an administrator select
+an active attendance device and opens an enrollment modal. It polls the
+enrollment status every two seconds only while that modal is open.
+
+Finally update the Pi from Git and add `ENROLLMENT_POLL_SECONDS=3` to
+`/etc/rfid-attendance.env` before restarting the existing service:
+
+```bash
+cd /home/raspberry-user/rfid-attendance
+git pull --ff-only origin main
+sudo nano /etc/rfid-attendance.env
+sudo systemctl restart attendance.service
+```
+
+Enrollment architecture:
+
+```text
+Dashboard → FastAPI/PostgreSQL ← Pi polls every 3 seconds
+                                      ↓
+                               OLED: Tap new card
+                                      ↓
+                                  RFID UID submit
+                                      ↓
+                           card assignment and normal mode
 ```
 
 ## Current backend scope

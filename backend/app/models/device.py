@@ -23,3 +23,6 @@ class Device(Base):
     )
 
     attendance_records: Mapped[list["Attendance"]] = relationship(back_populates="device")
+    enrollment_requests: Mapped[list["EnrollmentRequest"]] = relationship(
+        back_populates="device"
+    )

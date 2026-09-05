@@ -136,8 +136,99 @@ the old card.
 card from attendance eligibility by disabling it. It intentionally does not
 hard-delete the card row or rewrite historical attendance.
 
-Physical tap-to-enroll is not implemented here. These endpoints are manual
-administrative registration only; device-assisted enrollment is a later phase.
+These endpoints remain available for manual administrative or development
+assignment. Device-assisted enrollment is documented below.
+
+## Physical RFID enrollment
+
+Stage 3 uses normal HTTPS polling. The backend never connects directly to a
+Raspberry Pi. The dashboard creates one pending request for a selected active
+device; the Pi polls every few seconds and enters enrollment mode only while
+that request remains pending.
+
+### Create enrollment
+
+`POST /api/v1/enrollments`
+
+```json
+{
+  "student_id": 3,
+  "device_id": "attendance-pi-01"
+}
+```
+
+The student and device must both be active. At most one request can be pending
+per device. The backend calculates `expires_at` in UTC from
+`RFID_ENROLLMENT_TIMEOUT_SECONDS` (default 60 seconds).
+
+### Poll from the Pi
+
+`GET /api/v1/devices/{device_id}/enrollment`
+
+No active request:
+
+```json
+{ "status": "none" }
+```
+
+Pending request:
+
+```json
+{
+  "status": "pending",
+  "enrollment_id": 15,
+  "student": {
+    "id": 3,
+    "student_number": "ST003",
+    "name": "John Doe"
+  },
+  "expires_at": "2026-09-05T10:30:00Z"
+}
+```
+
+### Submit the tapped card
+
+`POST /api/v1/enrollments/{enrollment_id}/card`
+
+```json
+{
+  "device_id": "attendance-pi-01",
+  "card_uid": "123-45-67-89"
+}
+```
+
+On success the request is marked `completed`; if the student already has an
+active card, it is disabled and the new card becomes active. Historical
+attendance remains linked to the old card.
+
+```json
+{
+  "success": true,
+  "status": "completed",
+  "student": { "id": 3, "student_number": "ST003", "name": "John Doe" },
+  "card_status": "active"
+}
+```
+
+If a UID is already assigned, the request stays pending so the administrator
+can tap another card:
+
+```json
+{
+  "success": false,
+  "status": "pending",
+  "reason": "card_already_assigned"
+}
+```
+
+`POST /api/v1/enrollments/{enrollment_id}/cancel` safely changes a pending
+request to `cancelled`. `GET /api/v1/enrollments/{enrollment_id}` supports the
+dashboard modal's short-lived progress polling. Pending requests become
+`expired` lazily when polled, viewed, or submitted after `expires_at`.
+
+`GET /api/v1/devices` is a read-only device list used for enrollment selection.
+Manual student-card assignment remains available for administrative and
+development use.
 
 `GET /api/v1/attendance` returns newest-first attendance records. It accepts
 optional `page`, `page_size`, `search`, `date` (`YYYY-MM-DD`), and `device_id`

@@ -39,3 +39,6 @@ class Student(Base):
 
     rfid_cards: Mapped[list["RFIDCard"]] = relationship(back_populates="student")
     attendance_records: Mapped[list["Attendance"]] = relationship(back_populates="student")
+    enrollment_requests: Mapped[list["EnrollmentRequest"]] = relationship(
+        back_populates="student"
+    )
