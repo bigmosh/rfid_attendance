@@ -37,6 +37,108 @@ cards:
 }
 ```
 
+## Student administration
+
+All student list endpoints use `page` starting at 1 and accept `page_size`
+from 1 to 100. Administrative requests return safe `404` and `409` responses
+for expected missing-resource and conflict cases; they never expose database
+details.
+
+### List students
+
+`GET /api/v1/students?page=1&page_size=20&search=ST001&status=active`
+
+`search` matches student name and student number. `status` is optional and is
+either `active` or `inactive`.
+
+```json
+{
+  "items": [
+    {
+      "id": 1,
+      "student_number": "ST001",
+      "name": "Student 1",
+      "status": "active",
+      "rfid_card_status": "active"
+    }
+  ],
+  "page": 1,
+  "page_size": 20,
+  "total": 1,
+  "pages": 1
+}
+```
+
+### Create, view, and update a student
+
+`POST /api/v1/students`
+
+```json
+{
+  "student_number": "ST003",
+  "name": "John Doe"
+}
+```
+
+Student numbers are trimmed and normalised to uppercase; names have redundant
+whitespace collapsed. A duplicate student number returns HTTP `409`:
+
+```json
+{
+  "detail": {
+    "code": "student_number_exists",
+    "message": "Student number already exists"
+  }
+}
+```
+
+`GET /api/v1/students/{student_id}` returns student information and the active
+card, or the most recently disabled card if there is no active card.
+
+`PATCH /api/v1/students/{student_id}` accepts one or more of `name`,
+`student_number`, and `status` (`active` or `inactive`). Students are not
+hard-deleted. Setting `status` to `inactive` preserves historical attendance
+but rejects future attendance events.
+
+`GET /api/v1/students/{student_id}/attendance?page=1&page_size=10` returns the
+same newest-first attendance item format as the general attendance list, scoped
+to one student.
+
+### Manual RFID card administration
+
+`POST /api/v1/students/{student_id}/rfid-card` manually assigns a first card:
+
+```json
+{
+  "uid": "77-48-28-61-92"
+}
+```
+
+UIDs are trimmed and normalised to hyphen-separated decimal values. A UID must
+be unique; assigning a second active card returns HTTP `409` with code
+`active_card_exists`.
+
+`PATCH /api/v1/students/{student_id}/rfid-card` changes the current card's
+status:
+
+```json
+{
+  "status": "disabled"
+}
+```
+
+`POST /api/v1/students/{student_id}/rfid-card/replace` accepts the same UID
+body as assignment. It disables the currently active card and inserts a new
+active card in one transaction. Historical attendance continues to reference
+the old card.
+
+`POST /api/v1/students/{student_id}/rfid-card/unassign` safely removes the
+card from attendance eligibility by disabling it. It intentionally does not
+hard-delete the card row or rewrite historical attendance.
+
+Physical tap-to-enroll is not implemented here. These endpoints are manual
+administrative registration only; device-assisted enrollment is a later phase.
+
 `GET /api/v1/attendance` returns newest-first attendance records. It accepts
 optional `page`, `page_size`, `search`, `date` (`YYYY-MM-DD`), and `device_id`
 query parameters. `page` starts at 1 and `page_size` is limited to 1–100.
@@ -126,6 +228,15 @@ Disabled card:
 {
   "success": false,
   "reason": "card_disabled"
+}
+```
+
+Inactive student:
+
+```json
+{
+  "success": false,
+  "reason": "student_inactive"
 }
 ```
 

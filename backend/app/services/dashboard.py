@@ -54,6 +54,7 @@ def list_attendance(
     search=None,
     attendance_date=None,
     device_id=None,
+    student_id=None,
 ):
     """Return newest-first attendance records with joined student/device data."""
     filters = []
@@ -72,6 +73,8 @@ def list_attendance(
         filters.extend((Attendance.event_time >= start, Attendance.event_time < end))
     if device_id:
         filters.append(Device.device_id == device_id)
+    if student_id is not None:
+        filters.append(Attendance.student_id == student_id)
 
     base_query = select(Attendance).join(Attendance.student).join(Attendance.device)
     count_query = select(func.count()).select_from(Attendance).join(Attendance.student).join(Attendance.device)

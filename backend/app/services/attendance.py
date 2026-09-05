@@ -7,7 +7,7 @@ from sqlalchemy import select
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
-from app.models import Attendance, CardStatus, Device, RFIDCard
+from app.models import Attendance, CardStatus, Device, RFIDCard, StudentStatus
 from app.schemas.attendance import (
     AttendanceFailureResponse,
     AttendanceRequest,
@@ -56,6 +56,11 @@ def record_attendance(
             database_session.commit()
             LOGGER.info("Disabled card")
             return AttendanceFailureResponse(reason="card_disabled")
+
+        if card.student.status != StudentStatus.ACTIVE:
+            database_session.commit()
+            LOGGER.info("Inactive student")
+            return AttendanceFailureResponse(reason="student_inactive")
 
         attendance = Attendance(
             student_id=card.student_id,

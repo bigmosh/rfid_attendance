@@ -82,6 +82,15 @@ class AttendanceApiClientTests(TestCase):
         self.assertEqual(result.reason, "card_disabled")
 
     @patch("services.attendance.requests.post")
+    def test_inactive_student_returns_expected_reason(self, post):
+        post.return_value = _response(body={"success": False, "reason": "student_inactive"})
+
+        result = attendance.submit_attendance("77-48-28-61-92", EVENT_TIME)
+
+        self.assertFalse(result.success)
+        self.assertEqual(result.reason, "student_inactive")
+
+    @patch("services.attendance.requests.post")
     def test_unknown_device_returns_expected_reason(self, post):
         post.return_value = _response(body={"success": False, "reason": "unknown_device"})
 

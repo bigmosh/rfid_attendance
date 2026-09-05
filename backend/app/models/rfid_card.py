@@ -3,7 +3,7 @@
 from datetime import datetime
 from enum import Enum
 
-from sqlalchemy import DateTime, Enum as SqlEnum, ForeignKey, String, func
+from sqlalchemy import DateTime, Enum as SqlEnum, ForeignKey, Index, String, func, text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
@@ -16,6 +16,15 @@ class CardStatus(str, Enum):
 
 class RFIDCard(Base):
     __tablename__ = "rfid_cards"
+    __table_args__ = (
+        Index(
+            "uq_rfid_cards_one_active_per_student",
+            "student_id",
+            unique=True,
+            postgresql_where=text("status = 'active'"),
+            sqlite_where=text("status = 'active'"),
+        ),
+    )
 
     id: Mapped[int] = mapped_column(primary_key=True)
     uid: Mapped[str] = mapped_column(String(128), unique=True, nullable=False)

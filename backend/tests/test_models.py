@@ -9,7 +9,7 @@ from sqlalchemy.orm import sessionmaker
 
 from app.database import Base
 import app.models
-from app.models import Attendance, Device, RFIDCard, Student
+from app.models import Attendance, Device, RFIDCard, Student, StudentStatus
 
 
 @pytest.fixture
@@ -24,6 +24,7 @@ def session():
 def test_models_define_expected_tables_foreign_keys_timestamps_and_indexes():
     tables = Base.metadata.tables
     assert set(tables) == {"students", "rfid_cards", "devices", "attendance"}
+    assert tables["students"].c.status.type.enums == ["active", "inactive"]
 
     assert {foreign_key.target_fullname for foreign_key in tables["rfid_cards"].foreign_keys} == {
         "students.id"
@@ -41,7 +42,8 @@ def test_models_define_expected_tables_foreign_keys_timestamps_and_indexes():
     assert tables["attendance"].c.server_received_at.type.timezone is True
 
     assert {index.name for index in tables["rfid_cards"].indexes} == {
-        "ix_rfid_cards_student_id"
+        "ix_rfid_cards_student_id",
+        "uq_rfid_cards_one_active_per_student",
     }
     assert {index.name for index in tables["attendance"].indexes} == {
         "ix_attendance_student_id",
@@ -87,6 +89,14 @@ def test_student_number_is_unique(session):
         session.flush()
 
 
+def test_student_status_defaults_to_active(session):
+    student = Student(student_number="ST099", name="Status Test")
+    session.add(student)
+    session.flush()
+
+    assert student.status == StudentStatus.ACTIVE
+
+
 def test_rfid_uid_is_unique(session):
     student = Student(student_number="ST101", name="Card Test")
     session.add(student)
@@ -94,6 +104,18 @@ def test_rfid_uid_is_unique(session):
     session.add(RFIDCard(uid="1-2-3-4-5", student_id=student.id, status="active"))
     session.flush()
     session.add(RFIDCard(uid="1-2-3-4-5", student_id=student.id, status="active"))
+
+    with pytest.raises(IntegrityError):
+        session.flush()
+
+
+def test_only_one_active_card_is_allowed_per_student(session):
+    student = Student(student_number="ST102", name="Active Card Test")
+    session.add(student)
+    session.flush()
+    session.add(RFIDCard(uid="1-2-3-4", student_id=student.id, status="active"))
+    session.flush()
+    session.add(RFIDCard(uid="5-6-7-8", student_id=student.id, status="active"))
 
     with pytest.raises(IntegrityError):
         session.flush()

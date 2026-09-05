@@ -32,3 +32,43 @@ export interface DashboardSummary {
   registered_devices: number;
   active_rfid_cards: number;
 }
+
+export type StudentStatus = "active" | "inactive";
+export type RFIDCardStatus = "active" | "disabled";
+
+export interface RFIDCard {
+  id: number;
+  uid: string;
+  status: RFIDCardStatus;
+  created_at: string;
+}
+
+export interface StudentListItem extends Student {
+  status: StudentStatus;
+  rfid_card_status: RFIDCardStatus | null;
+}
+
+export interface StudentDetail extends Student {
+  status: StudentStatus;
+  created_at: string;
+  rfid_card: RFIDCard | null;
+}
+
+export interface StudentListResponse {
+  items: StudentListItem[];
+  page: number;
+  page_size: number;
+  total: number;
+  pages: number;
+}
+
+export interface StudentCreateInput {
+  student_number: string;
+  name: string;
+}
+
+export interface StudentUpdateInput {
+  student_number?: string;
+  name?: string;
+  status?: StudentStatus;
+}

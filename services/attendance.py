@@ -15,6 +15,7 @@ ATTENDANCE_PATH = "/api/v1/attendance"
 EXPECTED_FAILURE_REASONS = {
     "unknown_card",
     "card_disabled",
+    "student_inactive",
     "unknown_device",
 }
 

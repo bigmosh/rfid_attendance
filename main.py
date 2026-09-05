@@ -62,6 +62,10 @@ def run():
                 LOGGER.info("Disabled card detected")
                 display.show_error("Card disabled")
                 error_beep()
+            elif attendance_result.reason == "student_inactive":
+                LOGGER.info("Inactive student detected")
+                display.show_error("Student inactive")
+                error_beep()
             elif attendance_result.reason == "unknown_device":
                 LOGGER.error("Device is not registered by backend")
                 display.show_error("Device error")

@@ -10,6 +10,7 @@ from app.config import get_settings
 from app.routes.attendance import router as attendance_router
 from app.routes.dashboard import router as dashboard_router
 from app.routes.health import router as health_router
+from app.routes.students import router as students_router
 
 
 LOGGER = logging.getLogger(__name__)
@@ -43,12 +44,13 @@ def create_app():
         CORSMiddleware,
         allow_origins=settings.cors_origin_list,
         allow_credentials=False,
-        allow_methods=["GET", "POST"],
+        allow_methods=["GET", "POST", "PATCH"],
         allow_headers=["Content-Type"],
     )
     application.include_router(health_router)
     application.include_router(attendance_router)
     application.include_router(dashboard_router)
+    application.include_router(students_router)
     return application
 
 

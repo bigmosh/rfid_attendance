@@ -13,7 +13,8 @@ The repository currently contains two independent parts:
 - A React dashboard in `frontend/` that reads dashboard data through FastAPI.
 
 The complete data path is Raspberry Pi → HTTPS → FastAPI → PostgreSQL →
-dashboard. The dashboard is read-only in Stage 1.
+dashboard. The dashboard provides attendance visibility and Stage 2 student/
+RFID-card administration.
 
 ## Raspberry Pi edge application
 
@@ -205,10 +206,25 @@ example a production dashboard and a local Vite development server.
 
 ## Dashboard frontend
 
-The Stage 1 React dashboard is read-only. It has Overview, Attendance,
-Students placeholder, and Devices placeholder routes. Overview and Attendance
-poll the backend every eight seconds so a newly scanned card appears without a
-manual browser refresh.
+The React dashboard has Overview, Attendance, Students, Student Details, and
+a Devices placeholder route. Overview and Attendance poll the backend every
+eight seconds so a newly scanned card appears without a manual browser refresh.
+
+### Student and RFID-card lifecycle
+
+Students are never hard-deleted through the dashboard. An administrator can
+set a student to `inactive`, preserving the student's RFID-card records and
+all historical attendance. An inactive student's future RFID scans return the
+normal application response `{"success": false, "reason": "student_inactive"}`
+and do not create attendance rows. Reactivating the student restores normal
+attendance eligibility when their card is also active.
+
+The dashboard performs **manual UID assignment only** in this phase. It does
+not place a Raspberry Pi into card-enrollment mode; physical tap-to-enroll is a
+Stage 3 feature. A student may have one active RFID card. Replacing a card
+disables the old card and creates a new active row, retaining every historical
+attendance reference. “Unassign” is deliberately implemented as disabling the
+active card, not deleting a row, so attendance history remains intact.
 
 Run it locally:
 
@@ -252,6 +268,9 @@ application's `CORS_ORIGINS` value and redeploy the backend. Also set
 
 Alembic reads `DATABASE_URL` through `app.config`. The committed
 `0001_initial_schema` migration creates the initial PostgreSQL schema.
+`0003_add_student_status_and_active_card_constraint` adds the non-destructive
+student lifecycle status and a PostgreSQL partial unique index that allows at
+most one active RFID card per student.
 
 For later model changes, generate a migration from `backend/`, review it, and
 apply it explicitly:
@@ -281,10 +300,10 @@ source .venv/bin/activate
 pytest
 ```
 
-The backend tests cover health endpoints, attendance API outcomes,
-request-schema validation, model constraints, and idempotent seed data. They
-use mocks and in-memory SQLite only; they do not require PostgreSQL or
-Raspberry Pi hardware.
+The backend tests cover health endpoints, dashboard APIs, attendance outcomes,
+student/card lifecycle operations, request-schema validation, model
+constraints, and idempotent seed data. They use mocks and in-memory SQLite
+only; they do not require PostgreSQL or Raspberry Pi hardware.
 
 ## Docker and Coolify
 
@@ -351,6 +370,7 @@ https://<your-configured-domain>/health/db
 
 ## Current backend scope
 
-`GET /health`, `GET /health/db`, and `POST /api/v1/attendance` are available.
-The Raspberry Pi continues to use its local temporary lookup until Pi API
-integration is approved and deployed.
+`GET /health`, `GET /health/db`, attendance endpoints, dashboard endpoints,
+and student/card administration endpoints are available. The Raspberry Pi
+continues to use `POST /api/v1/attendance`; its proven RFID/OLED modules are
+not part of the backend or dashboard container deployments.

@@ -44,7 +44,7 @@ class AttendanceSuccessResponse(BaseModel):
 
 class AttendanceFailureResponse(BaseModel):
     success: Literal[False] = False
-    reason: Literal["unknown_card", "card_disabled", "unknown_device"]
+    reason: Literal["unknown_card", "card_disabled", "unknown_device", "student_inactive"]
 
 
 class AttendanceListItem(BaseModel):

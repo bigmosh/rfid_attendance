@@ -9,6 +9,9 @@ const pageTitles: Record<string, string> = {
 
 export function DashboardLayout() {
   const location = useLocation();
+  const pageTitle = location.pathname.startsWith("/students/")
+    ? "Student Details"
+    : (pageTitles[location.pathname] ?? "Dashboard");
   return (
     <div className="app-shell">
       <aside className="sidebar">
@@ -22,7 +25,7 @@ export function DashboardLayout() {
         <div className="sidebar-foot">Savonia UAS · IoT Thesis</div>
       </aside>
       <main className="main-content">
-        <header><p className="eyebrow">RFID ATTENDANCE SYSTEM</p><h1>{pageTitles[location.pathname] ?? "Dashboard"}</h1></header>
+        <header><p className="eyebrow">RFID ATTENDANCE SYSTEM</p><h1>{pageTitle}</h1></header>
         <Outlet />
       </main>
     </div>
