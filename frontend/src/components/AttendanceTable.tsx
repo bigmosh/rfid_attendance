@@ -1,7 +1,12 @@
 import type { AttendanceRecord } from "../types/api";
 
-function formatDate(value: string): string {
-  return new Intl.DateTimeFormat("en-GB", { dateStyle: "medium" }).format(new Date(value));
+function formatAttendanceDate(value: string): string {
+  // attendance_date is already the backend-authoritative APP_TIMEZONE date.
+  // Use UTC formatting so a browser timezone cannot shift the date value.
+  return new Intl.DateTimeFormat("en-GB", {
+    dateStyle: "medium",
+    timeZone: "UTC",
+  }).format(new Date(`${value}T12:00:00Z`));
 }
 
 function formatTime(value: string): string {
@@ -21,7 +26,7 @@ export function AttendanceTable({ records }: { records: AttendanceRecord[] }) {
             <tr key={record.id}>
               <td>{record.student.name}</td>
               <td>{record.student.student_number}</td>
-              <td>{formatDate(record.event_time)}</td>
+              <td>{formatAttendanceDate(record.attendance_date)}</td>
               <td>{formatTime(record.event_time)}</td>
               <td>{record.device.name}</td>
               <td><span className="status">{record.status}</span></td>

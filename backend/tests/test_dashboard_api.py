@@ -1,6 +1,6 @@
 """Read-only dashboard API tests using in-memory SQLite only."""
 
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 
 import pytest
@@ -56,10 +56,13 @@ def seed_dashboard_records(session_factory):
         card_2 = RFIDCard(uid="51-164-2-51-166", student_id=student_2.id, status=CardStatus.ACTIVE)
         session.add_all([card_1, card_2])
         session.flush()
+        student_1_recent = now - timedelta(minutes=20)
+        student_2_recent = now - timedelta(minutes=5)
+        student_1_previous = now - timedelta(days=1)
         session.add_all([
-            Attendance(student_id=student_1.id, rfid_card_id=card_1.id, device_id=device_1.id, event_time=now - timedelta(minutes=20), server_received_at=now - timedelta(minutes=20)),
-            Attendance(student_id=student_2.id, rfid_card_id=card_2.id, device_id=device_2.id, event_time=now - timedelta(minutes=5), server_received_at=now - timedelta(minutes=5)),
-            Attendance(student_id=student_1.id, rfid_card_id=card_1.id, device_id=device_1.id, event_time=now - timedelta(days=1), server_received_at=now - timedelta(days=1)),
+            Attendance(student_id=student_1.id, rfid_card_id=card_1.id, device_id=device_1.id, attendance_date=student_1_recent.date(), event_time=student_1_recent, server_received_at=student_1_recent),
+            Attendance(student_id=student_2.id, rfid_card_id=card_2.id, device_id=device_2.id, attendance_date=student_2_recent.date(), event_time=student_2_recent, server_received_at=student_2_recent),
+            Attendance(student_id=student_1.id, rfid_card_id=card_1.id, device_id=device_1.id, attendance_date=student_1_previous.date(), event_time=student_1_previous, server_received_at=student_1_previous),
         ])
 
 
@@ -112,6 +115,29 @@ def test_attendance_list_filters_by_search_date_and_device(dashboard_api):
 
     device_response = client.get("/api/v1/attendance?device_id=attendance-pi-01")
     assert device_response.json()["total"] == 2
+
+
+def test_attendance_date_filter_and_summary_use_authoritative_local_date(dashboard_api):
+    client, session_factory = dashboard_api
+    seed_dashboard_records(session_factory)
+    receipt = datetime(2026, 9, 6, 21, 30, tzinfo=timezone.utc)
+    with session_factory.begin() as session:
+        for record in session.query(Attendance).all():
+            record.attendance_date = date(2000, 1, 1)
+        record = session.get(Attendance, 1)
+        record.server_received_at = receipt
+        record.event_time = receipt
+        record.attendance_date = date(2026, 9, 7)
+
+    response = client.get("/api/v1/attendance?date=2026-09-07")
+    assert response.json()["total"] == 1
+    assert response.json()["items"][0]["attendance_date"] == "2026-09-07"
+    summary = get_dashboard_summary(
+        session_factory(),
+        "Europe/Helsinki",
+        now=datetime(2026, 9, 6, 21, 45, tzinfo=timezone.utc),
+    )
+    assert summary.attendance_today == 1
 
 
 def test_today_bounds_use_finland_timezone():

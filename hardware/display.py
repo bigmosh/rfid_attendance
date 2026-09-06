@@ -42,6 +42,10 @@ class OLEDDisplay:
     def show_success(self, student_name):
         self._show_lines("WELCOME", student_name, "", "Attendance OK")
 
+    def show_already_recorded(self, student_name):
+        """Show a successful repeat scan without creating another record."""
+        self._show_lines("ALREADY RECORDED", student_name, "", "Today")
+
     def show_unknown(self):
         self._show_lines("UNKNOWN CARD", "", "Not registered")
 

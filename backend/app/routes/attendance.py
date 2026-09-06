@@ -58,7 +58,11 @@ def create_attendance(
 ):
     """Record one attendance event for a valid device and active RFID card."""
     try:
-        return record_attendance(database_session, attendance_request)
+        return record_attendance(
+            database_session,
+            attendance_request,
+            get_settings().app_timezone,
+        )
     except SQLAlchemyError:
         # The service rolls back and logs the database error before re-raising.
         raise HTTPException(

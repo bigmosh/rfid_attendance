@@ -1,6 +1,6 @@
 """Attendance API request and response schemas for the next implementation step."""
 
-from datetime import datetime
+from datetime import date, datetime
 from math import ceil
 from typing import Literal
 
@@ -31,7 +31,8 @@ class AttendanceRequest(BaseModel):
 
 class AttendanceResponse(BaseModel):
     id: int
-    status: Literal["recorded"]
+    status: Literal["recorded", "already_recorded_today"]
+    attendance_date: date
     event_time: datetime
     server_received_at: datetime
 
@@ -51,9 +52,12 @@ class AttendanceListItem(BaseModel):
     id: int
     student: StudentResponse
     device: DeviceResponse
+    attendance_date: date
     event_time: datetime
     server_received_at: datetime
-    status: Literal["recorded"] = "recorded"
+    # Persisted rows are always recorded. The second-scan status is returned
+    # only by POST /attendance and does not create a dashboard row.
+    status: Literal["recorded", "already_recorded_today"] = "recorded"
 
 
 class AttendanceListResponse(BaseModel):

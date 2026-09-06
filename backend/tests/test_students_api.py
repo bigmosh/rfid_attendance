@@ -67,6 +67,7 @@ def seed_students(session_factory):
                 student_id=student_1.id,
                 rfid_card_id=active_card.id,
                 device_id=device.id,
+                attendance_date=(now - timedelta(minutes=1)).date(),
                 event_time=now - timedelta(minutes=1),
                 server_received_at=now - timedelta(minutes=1),
             )
@@ -233,6 +234,7 @@ def test_student_attendance_and_inactive_student_attendance_response(students_ap
     )
     assert active_scan.status_code == 200
     assert active_scan.json()["success"] is True
+    assert active_scan.json()["attendance"]["status"] == "already_recorded_today"
 
     with session_factory() as session:
-        assert len(list(session.scalars(select(Attendance)))) == 2
+        assert len(list(session.scalars(select(Attendance)))) == 1

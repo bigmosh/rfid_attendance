@@ -1,6 +1,6 @@
 """Database-model tests using local in-memory SQLite only."""
 
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 
 import pytest
 from sqlalchemy import create_engine
@@ -50,6 +50,10 @@ def test_models_define_expected_tables_foreign_keys_timestamps_and_indexes():
     assert tables["devices"].c.last_seen.type.timezone is True
     assert tables["attendance"].c.event_time.type.timezone is True
     assert tables["attendance"].c.server_received_at.type.timezone is True
+    assert tables["attendance"].c.attendance_date.type.python_type is date
+    assert {constraint.name for constraint in tables["attendance"].constraints} >= {
+        "uq_attendance_student_date"
+    }
     assert tables["enrollment_requests"].c.expires_at.type.timezone is True
     assert tables["enrollment_requests"].c.completed_at.type.timezone is True
 
@@ -83,6 +87,7 @@ def test_model_relationships_link_attendance_to_student_card_and_device(session)
         student_id=student.id,
         rfid_card_id=card.id,
         device_id=device.id,
+        attendance_date=datetime.now(timezone.utc).date(),
         event_time=datetime.now(timezone.utc),
     )
     session.add(attendance)
@@ -142,6 +147,41 @@ def test_device_identifier_is_unique(session):
     session.add(Device(device_id="attendance-pi-01", name="Device", status="active"))
     session.flush()
     session.add(Device(device_id="attendance-pi-01", name="Duplicate", status="active"))
+
+    with pytest.raises(IntegrityError):
+        session.flush()
+
+
+def test_only_one_attendance_is_allowed_per_student_and_local_date(session):
+    student = Student(student_number="ST103", name="Daily Attendance Test")
+    device = Device(device_id="daily-device", name="Daily Device", status="active")
+    session.add_all([student, device])
+    session.flush()
+    card = RFIDCard(uid="1-2-3-4-5", student_id=student.id, status="active")
+    session.add(card)
+    session.flush()
+    timestamp = datetime.now(timezone.utc)
+    session.add(
+        Attendance(
+            student_id=student.id,
+            rfid_card_id=card.id,
+            device_id=device.id,
+            attendance_date=timestamp.date(),
+            event_time=timestamp,
+            server_received_at=timestamp,
+        )
+    )
+    session.flush()
+    session.add(
+        Attendance(
+            student_id=student.id,
+            rfid_card_id=card.id,
+            device_id=device.id,
+            attendance_date=timestamp.date(),
+            event_time=timestamp,
+            server_received_at=timestamp,
+        )
+    )
 
     with pytest.raises(IntegrityError):
         session.flush()

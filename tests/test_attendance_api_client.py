@@ -43,7 +43,7 @@ class AttendanceApiClientTests(TestCase):
             body={
                 "success": True,
                 "student": {"id": 1, "student_number": "ST001", "name": "Student 1"},
-                "attendance": {"id": 42, "status": "recorded"},
+                "attendance": {"id": 42, "status": "recorded", "attendance_date": "2026-09-06"},
             }
         )
 
@@ -53,6 +53,7 @@ class AttendanceApiClientTests(TestCase):
         self.assertEqual(result.student_name, "Student 1")
         self.assertEqual(result.student_number, "ST001")
         self.assertEqual(result.attendance_id, 42)
+        self.assertEqual(result.attendance_status, "recorded")
         post.assert_called_once_with(
             "https://attendance.example.test/api/v1/attendance",
             json={
@@ -62,6 +63,25 @@ class AttendanceApiClientTests(TestCase):
             },
             timeout=5.0,
         )
+
+    @patch("services.attendance.requests.post")
+    def test_already_recorded_today_is_a_successful_attendance_result(self, post):
+        post.return_value = _response(
+            body={
+                "success": True,
+                "student": {"id": 1, "student_number": "ST001", "name": "Student 1"},
+                "attendance": {
+                    "id": 42,
+                    "status": "already_recorded_today",
+                    "attendance_date": "2026-09-06",
+                },
+            }
+        )
+
+        result = attendance.submit_attendance("77-48-28-61-92", EVENT_TIME)
+
+        self.assertTrue(result.success)
+        self.assertEqual(result.attendance_status, "already_recorded_today")
 
     @patch("services.attendance.requests.post")
     def test_unknown_card_returns_expected_reason(self, post):

@@ -250,6 +250,7 @@ values:
         "device_id": "attendance-pi-01",
         "name": "Main Attendance Device"
       },
+      "attendance_date": "2026-09-05",
       "event_time": "2026-09-05T09:04:00+03:00",
       "server_received_at": "2026-09-05T06:04:01Z",
       "status": "recorded"
@@ -266,8 +267,9 @@ values:
 
 `POST /api/v1/attendance`
 
-This endpoint is implemented. It resolves the device, RFID card, and student
-from PostgreSQL and creates one attendance record for each valid request.
+This endpoint resolves the device, RFID card, and student from PostgreSQL. It
+persists at most one attendance record per student for each `APP_TIMEZONE`
+calendar day.
 
 Request:
 
@@ -280,8 +282,11 @@ Request:
 ```
 
 `event_time` must be an ISO 8601 datetime with a timezone offset. It records
-when the Raspberry Pi observed the card. The backend will additionally store
-its own UTC-aware `server_received_at` timestamp when accepting the request.
+when the Raspberry Pi observed the card. The backend stores its own UTC-aware
+`server_received_at` timestamp when accepting the request, then derives
+`attendance_date` by converting that receipt timestamp to `APP_TIMEZONE`.
+`attendance_date` is the authoritative date for the one-per-day rule; the Pi
+timestamp is retained and is not repurposed.
 
 ### Successful response
 
@@ -296,11 +301,41 @@ its own UTC-aware `server_received_at` timestamp when accepting the request.
   "attendance": {
     "id": 123,
     "status": "recorded",
+    "attendance_date": "2026-09-03",
     "event_time": "2026-09-03T21:43:36+03:00",
     "server_received_at": "2026-09-03T18:43:36Z"
   }
 }
 ```
+
+### Repeat scan on the same local day
+
+A repeat scan by the same valid student on the same `attendance_date` is a
+successful outcome. It does not create a row; the backend returns the original
+attendance record for that day:
+
+```json
+{
+  "success": true,
+  "student": {
+    "id": 1,
+    "student_number": "ST001",
+    "name": "Student 1"
+  },
+  "attendance": {
+    "id": 123,
+    "status": "already_recorded_today",
+    "attendance_date": "2026-09-03",
+    "event_time": "2026-09-03T21:43:36+03:00",
+    "server_received_at": "2026-09-03T18:43:36Z"
+  }
+}
+```
+
+The database enforces this rule with `UNIQUE(student_id, attendance_date)`.
+The service checks first for a clear response, then catches a uniqueness race,
+fetches the canonical row, and returns `already_recorded_today` instead of a
+database error.
 
 ### Predictable failure responses
 
@@ -356,5 +391,7 @@ return HTTP `500` with a generic error message. No database details are sent
 to the client.
 
 For every request from a known active device, the backend updates that device's
-`last_seen` timestamp. There is deliberately no server-side time-window
-deduplication in this phase: each valid POST creates one attendance row.
+`last_seen` timestamp. A migration backfills `attendance_date` from existing
+`server_received_at` values in `APP_TIMEZONE`; for historical duplicate rows it
+retains the earliest `server_received_at` (then lowest id) per student/day and
+removes later duplicate test scans before applying the unique constraint.

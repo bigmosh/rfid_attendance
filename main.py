@@ -126,35 +126,7 @@ def run():
                 continue
 
             attendance_result = submit_attendance(uid)
-
-            if attendance_result.success:
-                LOGGER.info("Attendance recorded")
-                display.show_success(attendance_result.student_name)
-                success_beep()
-            elif attendance_result.reason == "unknown_card":
-                LOGGER.info("Unknown card detected")
-                display.show_unknown()
-                error_beep()
-            elif attendance_result.reason == "card_disabled":
-                LOGGER.info("Disabled card detected")
-                display.show_error("Card disabled")
-                error_beep()
-            elif attendance_result.reason == "student_inactive":
-                LOGGER.info("Inactive student detected")
-                display.show_error("Student inactive")
-                error_beep()
-            elif attendance_result.reason == "unknown_device":
-                LOGGER.error("Device is not registered by backend")
-                display.show_error("Device error")
-                error_beep()
-            elif attendance_result.reason == "network_error":
-                LOGGER.warning("Attendance backend is unreachable")
-                display.show_error("Network error")
-                error_beep()
-            else:
-                LOGGER.error("Unexpected attendance backend response")
-                display.show_error("Server error")
-                error_beep()
+            _show_attendance_result(display, attendance_result)
 
             _keep_removal_state_current(reader)
             display.show_ready()
@@ -190,6 +162,42 @@ def _keep_removal_state_current(reader):
     while time.monotonic() < deadline:
         reader.observe_removal()
         time.sleep(RFID_POLL_INTERVAL_SECONDS)
+
+
+def _show_attendance_result(display, attendance_result):
+    """Map a backend attendance outcome to the existing OLED/buzzer boundary."""
+    if attendance_result.success:
+        if attendance_result.attendance_status == "already_recorded_today":
+            LOGGER.info("Attendance already recorded today")
+            display.show_already_recorded(attendance_result.student_name)
+        else:
+            LOGGER.info("Attendance recorded")
+            display.show_success(attendance_result.student_name)
+        success_beep()
+    elif attendance_result.reason == "unknown_card":
+        LOGGER.info("Unknown card detected")
+        display.show_unknown()
+        error_beep()
+    elif attendance_result.reason == "card_disabled":
+        LOGGER.info("Disabled card detected")
+        display.show_error("Card disabled")
+        error_beep()
+    elif attendance_result.reason == "student_inactive":
+        LOGGER.info("Inactive student detected")
+        display.show_error("Student inactive")
+        error_beep()
+    elif attendance_result.reason == "unknown_device":
+        LOGGER.error("Device is not registered by backend")
+        display.show_error("Device error")
+        error_beep()
+    elif attendance_result.reason == "network_error":
+        LOGGER.warning("Attendance backend is unreachable")
+        display.show_error("Network error")
+        error_beep()
+    else:
+        LOGGER.error("Unexpected attendance backend response")
+        display.show_error("Server error")
+        error_beep()
 
 
 if __name__ == "__main__":

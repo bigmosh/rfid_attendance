@@ -28,6 +28,7 @@ class AttendanceResult:
     student_name: Optional[str] = None
     student_number: Optional[str] = None
     attendance_id: Optional[int] = None
+    attendance_status: Optional[str] = None
     reason: Optional[str] = None
 
 
@@ -99,12 +100,14 @@ def _parse_response(response_body):
             and isinstance(student.get("name"), str)
             and isinstance(student.get("student_number"), str)
             and isinstance(attendance.get("id"), int)
+            and attendance.get("status") in {"recorded", "already_recorded_today"}
         ):
             return AttendanceResult(
                 success=True,
                 student_name=student["name"],
                 student_number=student["student_number"],
                 attendance_id=attendance["id"],
+                attendance_status=attendance["status"],
             )
 
     LOGGER.warning("Attendance backend returned an unexpected response body")

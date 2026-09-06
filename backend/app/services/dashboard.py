@@ -26,13 +26,13 @@ def today_bounds(app_timezone, now=None):
 
 def get_dashboard_summary(database_session, app_timezone, now=None):
     """Return real counts for the overview cards."""
-    start, end = today_bounds(app_timezone, now=now)
+    start, _end = today_bounds(app_timezone, now=now)
     return DashboardSummaryResponse(
         total_students=database_session.scalar(select(func.count()).select_from(Student)) or 0,
         attendance_today=database_session.scalar(
             select(func.count())
             .select_from(Attendance)
-            .where(Attendance.event_time >= start, Attendance.event_time < end)
+            .where(Attendance.attendance_date == start.date())
         )
         or 0,
         registered_devices=database_session.scalar(select(func.count()).select_from(Device))
@@ -64,13 +64,7 @@ def list_attendance(
             Student.name.ilike(search_value) | Student.student_number.ilike(search_value)
         )
     if attendance_date:
-        start = datetime.combine(
-            attendance_date,
-            time.min,
-            tzinfo=ZoneInfo(app_timezone),
-        )
-        end = start + timedelta(days=1)
-        filters.extend((Attendance.event_time >= start, Attendance.event_time < end))
+        filters.append(Attendance.attendance_date == attendance_date)
     if device_id:
         filters.append(Device.device_id == device_id)
     if student_id is not None:
@@ -94,6 +88,7 @@ def list_attendance(
             id=record.id,
             student=StudentResponse.model_validate(record.student),
             device=DeviceResponse.model_validate(record.device),
+            attendance_date=record.attendance_date,
             event_time=record.event_time,
             server_received_at=record.server_received_at,
         )

@@ -320,9 +320,10 @@ pytest
 ```
 
 The backend tests cover health endpoints, dashboard APIs, attendance outcomes,
-student/card lifecycle operations, request-schema validation, model
-constraints, and idempotent seed data. They use mocks and in-memory SQLite
-only; they do not require PostgreSQL or Raspberry Pi hardware.
+daily attendance uniqueness and migration backfill, student/card lifecycle
+operations, request-schema validation, model constraints, and idempotent seed
+data. They use mocks and in-memory SQLite only; they do not require PostgreSQL
+or Raspberry Pi hardware.
 
 ## Docker and Coolify
 
@@ -429,6 +430,44 @@ Dashboard → FastAPI/PostgreSQL ← Pi polls every 3 seconds
                                   RFID UID submit
                                       ↓
                            card assignment and normal mode
+```
+
+### Stage 3.1 daily attendance deployment
+
+Daily attendance is one persisted row per student per `APP_TIMEZONE` local
+calendar day. The backend keeps the Pi-provided `event_time`, generates the
+authoritative UTC `server_received_at`, and derives `attendance_date` from the
+receipt timestamp in `APP_TIMEZONE`.
+
+The `0005_daily_attendance` migration backfills existing rows. If production
+contains previous same-day test scans, it deterministically retains the
+earliest `server_received_at` row (then the lowest id) for each student/date,
+logs the number of later duplicate rows removed through PostgreSQL migration
+output, and then creates `UNIQUE(student_id, attendance_date)`.
+
+`APP_TIMEZONE=Europe/Helsinki` is already required backend configuration; this
+stage introduces no additional environment variable. After deploying the new
+backend image, run only the controlled migration in the Coolify terminal:
+
+```bash
+cd /app
+python -m alembic upgrade head
+python -m alembic current
+```
+
+The Pi receives `recorded` for a first scan and `already_recorded_today` for a
+repeat scan. Both are successful. The latter displays `ALREADY RECORDED` and
+returns to the normal ready screen; it does not create a dashboard row.
+
+After the backend migration and frontend deployment, update the Pi application
+and restart its existing systemd service. No Pi environment-variable change is
+required for this stage:
+
+```bash
+cd /home/raspberry-user/rfid-attendance
+git pull --ff-only origin main
+sudo systemctl restart attendance.service
+sudo systemctl status attendance.service
 ```
 
 ## Current backend scope

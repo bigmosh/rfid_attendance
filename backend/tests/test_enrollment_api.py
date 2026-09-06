@@ -65,6 +65,7 @@ def seed_records(session_factory, include_existing_card=False):
                     student_id=student_1.id,
                     rfid_card_id=card.id,
                     device_id=device_1.id,
+                    attendance_date=now.date(),
                     event_time=now,
                     server_received_at=now,
                 )

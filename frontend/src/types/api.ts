@@ -13,9 +13,10 @@ export interface AttendanceRecord {
   id: number;
   student: Student;
   device: Device;
+  attendance_date: string;
   event_time: string;
   server_received_at: string;
-  status: "recorded";
+  status: "recorded" | "already_recorded_today";
 }
 
 export interface AttendanceListResponse {
