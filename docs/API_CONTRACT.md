@@ -337,6 +337,63 @@ The service checks first for a clear response, then catches a uniqueness race,
 fetches the canonical row, and returns `already_recorded_today` instead of a
 database error.
 
+## Encrypted attendance transport
+
+`POST /api/v1/attendance/encrypted` is the Raspberry Pi production transport
+for Stage 4. HTTPS remains mandatory. AES-128-GCM adds application-level
+confidentiality and authenticated tamper detection for the RFID UID and Pi
+event timestamp before they enter the existing HTTPS request path.
+
+The Pi serializes this plaintext deterministically using UTF-8 JSON with sorted
+keys and compact separators:
+
+```json
+{
+  "card_uid": "77-48-28-61-92",
+  "event_time": "2026-09-06T14:20:10+03:00"
+}
+```
+
+It generates a cryptographically random, unique 12-byte nonce for every
+message. AES-GCM produces ciphertext with its authentication tag appended.
+The `device_id` is deliberately outside the ciphertext so the backend can find
+the device key, but is also supplied as UTF-8 AES-GCM Associated Authenticated
+Data (AAD). Changing the device identity invalidates authentication.
+
+Request transport:
+
+```json
+{
+  "device_id": "attendance-pi-01",
+  "nonce": "<base64-encoded-12-byte-nonce>",
+  "ciphertext": "<base64-encoded-ciphertext-and-tag>"
+}
+```
+
+The backend validates the outer request, resolves the active device, loads its
+environment-configured Base64 AES-128 key, authenticates/decrypts with AAD,
+validates the decrypted JSON as the normal attendance payload, then calls the
+same attendance service used by the plaintext endpoint. Successful responses,
+including `recorded` and `already_recorded_today`, have exactly the normal
+attendance response semantics.
+
+Expected encrypted transport failures return a safe `success: false` response:
+
+```json
+{ "success": false, "reason": "authentication_failed" }
+```
+
+Other safe reasons are `unknown_device`, `device_key_not_configured`,
+`invalid_encrypted_payload`, and `invalid_plaintext_payload`. They reveal no
+key, nonce, plaintext, or database details. Tampered ciphertext, a wrong key,
+or a modified AAD/device ID all produce `authentication_failed` and create no
+attendance row.
+
+The existing `POST /api/v1/attendance` plaintext endpoint remains temporarily
+available for baseline comparison and development regression testing. The Pi
+does not fall back to it after encrypted transmission has been configured.
+Plaintext attendance may be removed or disabled in a later hardening stage.
+
 ### Predictable failure responses
 
 Unknown card:

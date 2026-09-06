@@ -15,6 +15,10 @@ class Settings(BaseSettings):
     app_timezone: str = "Europe/Helsinki"
     cors_origins: str = ""
     rfid_enrollment_timeout_seconds: int = Field(default=60, ge=15, le=600)
+    # JSON mapping of device_id to a base64-encoded 16-byte AES key. It is
+    # intentionally raw here so malformed production configuration can be
+    # handled as a safe request outcome without exposing secret values.
+    device_aes_keys_json: str = ""
 
     model_config = SettingsConfigDict(
         env_file=".env",

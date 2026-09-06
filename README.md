@@ -470,6 +470,74 @@ sudo systemctl restart attendance.service
 sudo systemctl status attendance.service
 ```
 
+### Stage 4 AES-128-GCM encrypted attendance deployment
+
+HTTPS remains enabled and terminates at Coolify as before. Stage 4 adds an
+application-level AES-128-GCM layer for normal Pi attendance payloads:
+
+```text
+RFID UID + Pi event time
+        ↓
+deterministic JSON serialization
+        ↓
+AES-128-GCM (fresh random 12-byte nonce; device_id as AAD)
+        ↓
+device_id + nonce + ciphertext over HTTPS
+        ↓
+FastAPI device-key lookup and AES-GCM authentication/decryption
+        ↓
+existing attendance validation, daily deduplication, PostgreSQL
+```
+
+AES-GCM provides authenticated encryption: a tampered ciphertext, wrong key,
+or modified `device_id`/AAD is rejected without creating attendance. It is an
+additional protection layer, not a replacement for TLS. The design uses one
+shared 16-byte AES-128 key per device, no key rotation or replay-nonce database
+in this thesis stage.
+
+Generate a key locally only when configuring the production environments; do
+not commit or paste its output into documentation, source, or Git history:
+
+```bash
+python3 - <<'PY'
+import base64
+import os
+print(base64.b64encode(os.urandom(16)).decode("ascii"))
+PY
+```
+
+Configure the generated value in Coolify as one JSON environment variable:
+
+```text
+DEVICE_AES_KEYS_JSON={"attendance-pi-01":"<base64-encoded-16-byte-key>"}
+```
+
+Configure the identical value on the Pi in `/etc/rfid-attendance.env`:
+
+```text
+DEVICE_AES_KEY_BASE64=<base64-encoded-16-byte-key>
+```
+
+The Pi validates that this decodes to exactly 16 bytes at startup. A missing,
+malformed, or wrong-length key stops the application clearly; encrypted mode
+never silently downgrades to `POST /api/v1/attendance`. Encryption and backend
+authentication timings are logged at debug level in milliseconds for later
+thesis measurements, without logging plaintext, keys, or ciphertext.
+
+Production sequence after reviewing this change:
+
+1. Set `DEVICE_AES_KEYS_JSON` in the Coolify backend environment and deploy
+   the backend image. No database migration is required; Alembic remains at
+   `0005_daily_attendance`.
+2. Update the Pi code and install the declared dependency in its existing venv.
+3. Add `DEVICE_AES_KEY_BASE64` to `/etc/rfid-attendance.env` with permissions
+   still restricted to root.
+4. Restart `attendance.service` and verify its journal before testing a card.
+
+Physical enrollment traffic remains its existing HTTPS JSON flow in this stage.
+The plaintext attendance endpoint remains available only for baseline
+comparison and regression testing; it is not used by the Stage 4 Pi client.
+
 ## Current backend scope
 
 `GET /health`, `GET /health/db`, attendance endpoints, dashboard endpoints,

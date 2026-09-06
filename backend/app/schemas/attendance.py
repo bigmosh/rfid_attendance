@@ -29,6 +29,14 @@ class AttendanceRequest(BaseModel):
         return value
 
 
+class EncryptedAttendanceRequest(BaseModel):
+    """Outer encrypted transport; card UID and event time stay confidential."""
+
+    device_id: str = Field(min_length=1, max_length=128)
+    nonce: str = Field(min_length=1, max_length=256)
+    ciphertext: str = Field(min_length=1, max_length=4096)
+
+
 class AttendanceResponse(BaseModel):
     id: int
     status: Literal["recorded", "already_recorded_today"]
@@ -46,6 +54,19 @@ class AttendanceSuccessResponse(BaseModel):
 class AttendanceFailureResponse(BaseModel):
     success: Literal[False] = False
     reason: Literal["unknown_card", "card_disabled", "unknown_device", "student_inactive"]
+
+
+class AttendanceEncryptedFailureResponse(BaseModel):
+    """Safe expected failures specific to encrypted attendance transport."""
+
+    success: Literal[False] = False
+    reason: Literal[
+        "unknown_device",
+        "device_key_not_configured",
+        "invalid_encrypted_payload",
+        "authentication_failed",
+        "invalid_plaintext_payload",
+    ]
 
 
 class AttendanceListItem(BaseModel):

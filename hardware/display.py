@@ -46,6 +46,14 @@ class OLEDDisplay:
         """Show a successful repeat scan without creating another record."""
         self._show_lines("ALREADY RECORDED", student_name, "", "Today")
 
+    def show_secure_send_failed(self):
+        """Show a safe encrypted-transport failure without crypto details."""
+        self._show_lines("SECURE SEND", "FAILED")
+
+    def show_security_config_error(self):
+        """Show startup key configuration failure without exposing key data."""
+        self._show_lines("SECURE CONFIG", "INVALID")
+
     def show_unknown(self):
         self._show_lines("UNKNOWN CARD", "", "Not registered")
 

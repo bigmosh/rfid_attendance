@@ -69,6 +69,8 @@ class AttendanceDisplayTests(unittest.TestCase):
         with patch.object(application, "OLEDDisplay", return_value=display), patch.object(
             application, "RFIDReader", return_value=reader
         ), patch.object(
+            application, "load_device_aes_key", return_value=b"0123456789abcdef"
+        ), patch.object(
             application,
             "poll_enrollment",
             side_effect=[

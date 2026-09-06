@@ -7,3 +7,6 @@ adafruit-circuitpython-ssd1306
 
 # HTTPS client used by the edge attendance service.
 requests>=2.31,<3.0
+
+# AES-128-GCM authenticated encryption for attendance payloads.
+cryptography>=43,<46

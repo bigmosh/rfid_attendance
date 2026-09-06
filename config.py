@@ -20,6 +20,7 @@ API_BASE_URL = os.getenv(
     "https://attendance.example.invalid",
 ).rstrip("/")
 DEVICE_ID = os.getenv("DEVICE_ID", "attendance-pi-01")
+DEVICE_AES_KEY_BASE64 = os.getenv("DEVICE_AES_KEY_BASE64", "")
 
 try:
     REQUEST_TIMEOUT_SECONDS = float(os.getenv("REQUEST_TIMEOUT_SECONDS", "5"))

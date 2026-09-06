@@ -7,6 +7,7 @@ from unittest.mock import Mock, patch
 import requests
 
 from services import attendance
+from services.crypto import decrypt_payload
 
 
 EVENT_TIME = datetime(2026, 9, 4, 10, 30, tzinfo=timezone(timedelta(hours=3)))
@@ -30,12 +31,19 @@ class AttendanceApiClientTests(TestCase):
         )
         self.device_id_patcher = patch.object(attendance, "DEVICE_ID", "attendance-pi-01")
         self.timeout_patcher = patch.object(attendance, "REQUEST_TIMEOUT_SECONDS", 5.0)
+        self.key_patcher = patch.object(
+            attendance,
+            "load_device_aes_key",
+            return_value=b"0123456789abcdef",
+        )
         self.api_base_url_patcher.start()
         self.device_id_patcher.start()
         self.timeout_patcher.start()
+        self.key_patcher.start()
         self.addCleanup(self.api_base_url_patcher.stop)
         self.addCleanup(self.device_id_patcher.stop)
         self.addCleanup(self.timeout_patcher.stop)
+        self.addCleanup(self.key_patcher.stop)
 
     @patch("services.attendance.requests.post")
     def test_success_returns_student_result_and_sends_correct_payload(self, post):
@@ -54,15 +62,24 @@ class AttendanceApiClientTests(TestCase):
         self.assertEqual(result.student_number, "ST001")
         self.assertEqual(result.attendance_id, 42)
         self.assertEqual(result.attendance_status, "recorded")
-        post.assert_called_once_with(
-            "https://attendance.example.test/api/v1/attendance",
-            json={
-                "device_id": "attendance-pi-01",
-                "card_uid": "77-48-28-61-92",
-                "event_time": "2026-09-04T10:30:00+03:00",
-            },
-            timeout=5.0,
+        post.assert_called_once()
+        endpoint, = post.call_args.args
+        payload = post.call_args.kwargs["json"]
+        self.assertEqual(endpoint, "https://attendance.example.test/api/v1/attendance/encrypted")
+        self.assertEqual(payload["device_id"], "attendance-pi-01")
+        self.assertNotIn("card_uid", payload)
+        self.assertNotIn("event_time", payload)
+        self.assertEqual(set(payload), {"device_id", "nonce", "ciphertext"})
+        self.assertEqual(
+            decrypt_payload(
+                payload["nonce"],
+                payload["ciphertext"],
+                b"0123456789abcdef",
+                "attendance-pi-01",
+            ),
+            {"card_uid": "77-48-28-61-92", "event_time": "2026-09-04T10:30:00+03:00"},
         )
+        self.assertEqual(post.call_args.kwargs["timeout"], 5.0)
 
     @patch("services.attendance.requests.post")
     def test_already_recorded_today_is_a_successful_attendance_result(self, post):
@@ -159,3 +176,27 @@ class AttendanceApiClientTests(TestCase):
 
         self.assertFalse(result.success)
         self.assertEqual(result.reason, "server_error")
+
+    @patch("services.attendance.requests.post")
+    def test_crypto_rejection_is_not_retried_as_plaintext(self, post):
+        post.return_value = _response(
+            body={"success": False, "reason": "authentication_failed"}
+        )
+
+        result = attendance.submit_attendance("77-48-28-61-92", EVENT_TIME)
+
+        self.assertFalse(result.success)
+        self.assertEqual(result.reason, "secure_send_failed")
+        self.assertEqual(post.call_count, 1)
+
+    def test_missing_or_invalid_local_key_fails_before_any_http_request(self):
+        with patch.object(
+            attendance,
+            "load_device_aes_key",
+            side_effect=attendance.CryptoConfigurationError("invalid key"),
+        ), patch("services.attendance.requests.post") as post:
+            result = attendance.submit_attendance("77-48-28-61-92", EVENT_TIME)
+
+        self.assertFalse(result.success)
+        self.assertEqual(result.reason, "secure_send_failed")
+        post.assert_not_called()

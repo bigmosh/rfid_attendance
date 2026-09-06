@@ -39,8 +39,9 @@ class DeploymentFileTests(unittest.TestCase):
         self.assertIn("DEVICE_ID=attendance-pi-01", environment)
         self.assertIn("REQUEST_TIMEOUT_SECONDS=5", environment)
         self.assertIn("ENROLLMENT_POLL_SECONDS=3", environment)
+        self.assertIn("DEVICE_AES_KEY_BASE64=<base64-encoded-16-byte-key>", environment)
         self.assertNotIn("PASSWORD=", environment)
-        self.assertNotIn("AES", environment)
+        self.assertNotIn("MDEyMzQ1Njc4OWFiY2RlZg==", environment)
 
     def test_readme_documents_systemd_management_commands(self):
         readme = README.read_text()

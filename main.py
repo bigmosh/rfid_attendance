@@ -15,6 +15,7 @@ from hardware.buzzer import error_beep, success_beep
 from hardware.display import OLEDDisplay
 from hardware.rfid import RFIDReader
 from services.attendance import submit_attendance
+from services.crypto import CryptoConfigurationError, load_device_aes_key
 from services.enrollment import poll_enrollment, submit_enrollment_card
 
 
@@ -43,6 +44,11 @@ def run():
         LOGGER.info("Application starting")
         display = OLEDDisplay()
         display.show_booting()
+
+        # Encrypted attendance is mandatory once Stage 4 is deployed. Refuse
+        # startup instead of silently downgrading normal scans to plaintext.
+        load_device_aes_key()
+        LOGGER.info("Encrypted attendance key configuration validated")
 
         reader = RFIDReader()
         display.show_ready()
@@ -134,6 +140,14 @@ def run():
     except KeyboardInterrupt:
         LOGGER.info("Shutdown requested")
         return 0
+    except CryptoConfigurationError as error:
+        LOGGER.error("Encrypted attendance configuration error: %s", error)
+        if display is not None:
+            try:
+                display.show_security_config_error()
+            except Exception:
+                LOGGER.exception("Unable to show security configuration error on OLED")
+        return 1
     except Exception:
         LOGGER.exception("Hardware error")
         if display is not None:
@@ -193,6 +207,10 @@ def _show_attendance_result(display, attendance_result):
     elif attendance_result.reason == "network_error":
         LOGGER.warning("Attendance backend is unreachable")
         display.show_error("Network error")
+        error_beep()
+    elif attendance_result.reason == "secure_send_failed":
+        LOGGER.warning("Encrypted attendance submission was rejected or could not be sent")
+        display.show_secure_send_failed()
         error_beep()
     else:
         LOGGER.error("Unexpected attendance backend response")

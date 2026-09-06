@@ -1,6 +1,7 @@
 """HTTPS attendance API client for the Raspberry Pi edge application."""
 
 import logging
+import time
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Optional
@@ -8,15 +9,22 @@ from typing import Optional
 import requests
 
 from config import API_BASE_URL, DEVICE_ID, REQUEST_TIMEOUT_SECONDS
+from services.crypto import CryptoConfigurationError, encrypt_payload, load_device_aes_key
 
 
 LOGGER = logging.getLogger(__name__)
-ATTENDANCE_PATH = "/api/v1/attendance"
+ATTENDANCE_PATH = "/api/v1/attendance/encrypted"
 EXPECTED_FAILURE_REASONS = {
     "unknown_card",
     "card_disabled",
     "student_inactive",
     "unknown_device",
+}
+SECURE_FAILURE_REASONS = {
+    "device_key_not_configured",
+    "invalid_encrypted_payload",
+    "authentication_failed",
+    "invalid_plaintext_payload",
 }
 
 
@@ -43,14 +51,30 @@ def submit_attendance(card_uid, event_time=None):
     if event_time.tzinfo is None or event_time.utcoffset() is None:
         raise ValueError("event_time must be timezone-aware")
 
-    payload = {
-        "device_id": DEVICE_ID,
+    plaintext_payload = {
         "card_uid": card_uid,
         "event_time": event_time.isoformat(),
     }
+    try:
+        encrypted_payload = encrypt_payload(
+            plaintext_payload,
+            load_device_aes_key(),
+            DEVICE_ID,
+        )
+    except CryptoConfigurationError as error:
+        LOGGER.error("Encrypted attendance key configuration error: %s", error)
+        return AttendanceResult(success=False, reason="secure_send_failed")
+
+    payload = {
+        "device_id": DEVICE_ID,
+        "nonce": encrypted_payload.nonce,
+        "ciphertext": encrypted_payload.ciphertext,
+    }
     endpoint = f"{API_BASE_URL}{ATTENDANCE_PATH}"
 
-    LOGGER.info("Submitting attendance event for device %s", DEVICE_ID)
+    LOGGER.debug("Attendance payload encrypted in %.2f ms", encrypted_payload.encryption_ms)
+    LOGGER.info("Submitting encrypted attendance event for device %s", DEVICE_ID)
+    request_started = time.perf_counter()
     try:
         response = requests.post(
             endpoint,
@@ -66,6 +90,11 @@ def submit_attendance(card_uid, event_time=None):
     except requests.RequestException:
         LOGGER.warning("Attendance request failed")
         return AttendanceResult(success=False, reason="network_error")
+
+    LOGGER.debug(
+        "Encrypted attendance request completed in %.2f ms",
+        (time.perf_counter() - request_started) * 1000,
+    )
 
     if not 200 <= response.status_code < 300:
         LOGGER.warning("Attendance backend returned HTTP %s", response.status_code)
@@ -90,6 +119,8 @@ def _parse_response(response_body):
         reason = response_body.get("reason")
         if reason in EXPECTED_FAILURE_REASONS:
             return AttendanceResult(success=False, reason=reason)
+        if reason in SECURE_FAILURE_REASONS:
+            return AttendanceResult(success=False, reason="secure_send_failed")
 
     if response_body.get("success") is True:
         student = response_body.get("student")

@@ -10,12 +10,15 @@ from app.config import get_settings
 from app.database import get_db
 from app.schemas.attendance import (
     AttendanceFailureResponse,
+    AttendanceEncryptedFailureResponse,
     AttendanceListResponse,
     AttendanceRequest,
     AttendanceSuccessResponse,
+    EncryptedAttendanceRequest,
 )
 from app.services.attendance import record_attendance
 from app.services.dashboard import list_attendance
+from app.services.encrypted_attendance import record_encrypted_attendance
 
 
 router = APIRouter(prefix="/api/v1", tags=["attendance"])
@@ -65,6 +68,35 @@ def create_attendance(
         )
     except SQLAlchemyError:
         # The service rolls back and logs the database error before re-raising.
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Internal server error",
+        ) from None
+
+
+@router.post(
+    "/attendance/encrypted",
+    response_model=(
+        AttendanceSuccessResponse
+        | AttendanceFailureResponse
+        | AttendanceEncryptedFailureResponse
+    ),
+)
+def create_encrypted_attendance(
+    encrypted_request: EncryptedAttendanceRequest,
+    database_session: Session = Depends(get_db),
+):
+    """Authenticate/decrypt an AES-GCM payload and record normal attendance."""
+    try:
+        settings = get_settings()
+        return record_encrypted_attendance(
+            database_session,
+            encrypted_request,
+            settings.app_timezone,
+            settings.device_aes_keys_json,
+        )
+    except SQLAlchemyError:
+        database_session.rollback()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Internal server error",
