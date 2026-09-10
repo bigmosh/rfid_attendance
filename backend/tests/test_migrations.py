@@ -16,8 +16,9 @@ def test_alembic_has_expected_current_head():
     configuration = Config(str(BACKEND_DIRECTORY / "alembic.ini"))
     script_directory = ScriptDirectory.from_config(configuration)
 
-    assert script_directory.get_current_head() == "0005_daily_attendance"
+    assert script_directory.get_current_head() == "0006_purge_students"
     assert [revision.revision for revision in script_directory.walk_revisions()] == [
+        "0006_purge_students",
         "0005_daily_attendance",
         "0004_rfid_enrollment",
         "0003_student_status",

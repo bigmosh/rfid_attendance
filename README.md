@@ -176,10 +176,12 @@ cp .env.example .env
 Set `DATABASE_URL` in `backend/.env` to a local PostgreSQL URL. Do not commit
 this file.
 
-Apply the initial schema, then seed the demo data:
+Apply the schema. The seed command is an optional local demo utility only:
 
 ```bash
 alembic upgrade head
+# Optional: creates the two documented demo students/cards and demo device.
+# Do not run this after the one-time 0006_purge_students reset migration.
 python3 -m scripts.seed_demo_data
 ```
 
@@ -363,18 +365,19 @@ repository or Dockerfile.
 ### Post-deployment database operations
 
 After the Coolify application is deployed with `DATABASE_URL` configured, open
-its application terminal. The container work directory is `/app`. Run these
-commands once, in this order:
+its application terminal. The container work directory is `/app`. Apply the
+migrations explicitly:
 
 ```bash
 cd /app
 python -m alembic upgrade head
-python -m scripts.seed_demo_data
 ```
 
 The migration command is explicit and is not run automatically at startup.
-The seed command is idempotent: it creates missing demo records and does not
-duplicate records on later runs.
+`scripts.seed_demo_data` remains an idempotent, manually invoked local demo
+utility; it is never invoked by application startup or deployment. Do not run
+it after `0006_purge_students`, which intentionally leaves students, cards,
+attendance, and enrollment requests empty while preserving registered devices.
 
 Optionally confirm that the database is at the current Alembic revision:
 
